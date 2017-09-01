@@ -881,11 +881,11 @@ public class Camera2BasicFragment extends Fragment
                     unlockFocus();
 
                     // Send the timestamp
-                    networkTask.sendStringToNetwork(Long.toString(time));
+                    networkTask.sendLongToNetwork(time);
 
                     //Send the size of the file
                     long sizeBytes = mFile.length();
-                    networkTask.sendStringToNetwork(Long.toString(sizeBytes));
+                    networkTask.sendLongToNetwork(sizeBytes);
 
                     // Now send the actual file
                     networkTask.sendDataToNetwork(mFile);
@@ -1089,6 +1089,18 @@ public class Camera2BasicFragment extends Fragment
         }
     }
 
+    /**
+     * Helper function to convert a long to a byte[]
+     */
+    public static byte[] longToBytes(long l) {
+        byte[] result = new byte[8];
+        for (int i = 7; i >= 0; i--) {
+            result[i] = (byte)(l & 0xFF);
+            l >>= 8;
+        }
+        return result;
+    }
+
     public class NetworkTask extends AsyncTask<Void, byte[], Boolean> {
         private final int portNum = 54321;
         protected ServerSocket listener;
@@ -1113,7 +1125,7 @@ public class Camera2BasicFragment extends Fragment
                     Log.d(TAG, "Waiting for client to connect");
                     socket = listener.accept();
                     if (socket.isConnected()) {
-                        Log.d(TAG, String.format("Client connected from: %s", socket.getRemoteSocketAddress().toString()));
+                        showToast(String.format("Client connected from: %s", socket.getRemoteSocketAddress().toString()));
                         nis = socket.getInputStream();
                         nos = socket.getOutputStream();
                         Log.i(TAG, "doInBackground: Socket created, streams assigned");
@@ -1171,13 +1183,13 @@ public class Camera2BasicFragment extends Fragment
             }
         }
 
-        public void sendStringToNetwork(String string) {
+        public void sendLongToNetwork(long number) {
             try {
                 if(null != socket && socket.isConnected()) {
-                    nos.write(string.getBytes());
+                    nos.write(longToBytes(number));
                 }
             } catch (IOException e) {
-                Log.e(TAG, "sendStringToNetwork: IOException");
+                Log.e(TAG, "sendLongToNetwork: IOException");
             }
         }
     }
