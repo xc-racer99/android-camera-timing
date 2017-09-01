@@ -283,6 +283,11 @@ public class Camera2BasicFragment extends Fragment
     private int mSensorOrientation;
 
     /**
+     *  Time we received the impulse to take a picture
+     */
+    private long time;
+
+    /**
      * A {@link CameraCaptureSession.CaptureCallback} that handles events related to JPEG capture.
      */
     private CameraCaptureSession.CaptureCallback mCaptureCallback
@@ -512,10 +517,10 @@ public class Camera2BasicFragment extends Fragment
 
                 // For still image captures, we use the largest available size.
                 Size largest = Collections.max(
-                        Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
+                        Arrays.asList(map.getOutputSizes(ImageFormat.YUV_420_888)),
                         new CompareSizesByArea());
                 mImageReader = ImageReader.newInstance(
-                        largest.getWidth() / 16, largest.getHeight() / 16, ImageFormat.JPEG, 2);
+                        largest.getWidth() / 16, largest.getHeight() / 16, ImageFormat.YUV_420_888, 2);
                 mImageReader.setOnImageAvailableListener(
                         mOnImageAvailableListener, mBackgroundHandler);
 
@@ -775,6 +780,7 @@ public class Camera2BasicFragment extends Fragment
      * Initiate a still image capture.
      */
     private void takePicture() {
+        time = System.currentTimeMillis();
         lockFocus();
     }
 
@@ -849,6 +855,8 @@ public class Camera2BasicFragment extends Fragment
                     unlockFocus();
                 }
             };
+
+            showToast(String.format("Time: %d", System.currentTimeMillis() - time));
 
             mCaptureSession.stopRepeating();
             mCaptureSession.capture(captureBuilder.build(), CaptureCallback, null);
