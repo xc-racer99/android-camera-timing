@@ -781,7 +781,7 @@ public class Camera2BasicFragment extends Fragment
     /**
      * Initiate a still image capture.
      */
-    private void takePicture() {
+    public void takePicture() {
         time = System.currentTimeMillis();
         lockFocus();
     }

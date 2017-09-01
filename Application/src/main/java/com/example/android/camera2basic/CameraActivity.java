@@ -18,6 +18,7 @@ package com.example.android.camera2basic;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.view.KeyEvent;
 import android.view.WindowManager;
 
 public class CameraActivity extends Activity {
@@ -34,6 +35,23 @@ public class CameraActivity extends Activity {
             getFragmentManager().beginTransaction()
                     .replace(R.id.container, Camera2BasicFragment.newInstance())
                     .commit();
+        }
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent keyEvent) {
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_VOLUME_DOWN:
+            case KeyEvent.KEYCODE_HEADSETHOOK:
+            case KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD:
+            case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+            case KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD:
+                Camera2BasicFragment fragment = (Camera2BasicFragment) getFragmentManager().findFragmentById(R.id.container);
+                fragment.takePicture();
+                return true;
+
+            default:
+                return super.onKeyDown(keyCode, keyEvent);
         }
     }
 
