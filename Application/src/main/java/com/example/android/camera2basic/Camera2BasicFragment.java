@@ -45,6 +45,7 @@ import android.media.Image;
 import android.media.ImageReader;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -59,11 +60,17 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -157,6 +164,16 @@ public class Camera2BasicFragment extends Fragment
         }
 
     };
+
+    /**
+     * Button used to start the server
+     */
+    protected Button mServerButton;
+
+    /**
+     * Asynchronous network server
+     */
+    protected NetworkTask networkTask;
 
     /**
      * ID of the current {@link CameraDevice}.
@@ -435,7 +452,8 @@ public class Camera2BasicFragment extends Fragment
 
     @Override
     public void onViewCreated(final View view, Bundle savedInstanceState) {
-        view.findViewById(R.id.picture).setOnClickListener(this);
+        mServerButton = (Button) view.findViewById(R.id.picture);
+        mServerButton.setOnClickListener(this);
         view.findViewById(R.id.info).setOnClickListener(this);
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
     }
@@ -782,7 +800,13 @@ public class Camera2BasicFragment extends Fragment
      * Initiate a still image capture.
      */
     public void takePicture() {
+        if (networkTask == null) {
+            showToast("Start server first before taking a picture");
+            return;
+        }
+
         time = System.currentTimeMillis();
+        mFile = new File(getActivity().getExternalFilesDir(null), time + ".jpg");
         lockFocus();
     }
 
@@ -855,6 +879,16 @@ public class Camera2BasicFragment extends Fragment
                     showToast("Saved: " + mFile);
                     Log.d(TAG, mFile.toString());
                     unlockFocus();
+
+                    // Send the timestamp
+                    networkTask.sendStringToNetwork(Long.toString(time));
+
+                    //Send the size of the file
+                    long sizeBytes = mFile.length();
+                    networkTask.sendStringToNetwork(Long.toString(sizeBytes));
+
+                    // Now send the actual file
+                    networkTask.sendDataToNetwork(mFile);
                 }
             };
 
@@ -906,7 +940,8 @@ public class Camera2BasicFragment extends Fragment
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.picture: {
-                takePicture();
+                networkTask = new NetworkTask();
+                networkTask.execute();
                 break;
             }
             case R.id.info: {
@@ -1051,6 +1086,99 @@ public class Camera2BasicFragment extends Fragment
                                 }
                             })
                     .create();
+        }
+    }
+
+    public class NetworkTask extends AsyncTask<Void, byte[], Boolean> {
+        private final int portNum = 54321;
+        protected ServerSocket listener;
+        Socket socket;
+        InputStream nis;
+        OutputStream nos;
+
+        @Override
+        protected void onPreExecute(){
+            Log.i(TAG, "onPreExecute of NetworkTask");
+            mServerButton.setText(R.string.server_running);
+            mServerButton.setClickable(false);
+        }
+
+        @Override
+        protected Boolean doInBackground(Void... params) {
+            boolean result = false;
+            try {
+                listener = new ServerSocket(portNum);
+                Log.d(TAG, String.format("Listening on port %d", portNum));
+                while(true) {
+                    Log.d(TAG, "Waiting for client to connect");
+                    socket = listener.accept();
+                    if (socket.isConnected()) {
+                        Log.d(TAG, String.format("Client connected from: %s", socket.getRemoteSocketAddress().toString()));
+                        nis = socket.getInputStream();
+                        nos = socket.getOutputStream();
+                        Log.i(TAG, "doInBackground: Socket created, streams assigned");
+                        Log.i(TAG, "doInBackground: Waiting for initial data");
+
+                        byte[] buffer = new byte[4096];
+                        int read = nis.read(buffer, 0, 4096); //This is blocking
+                        while(read != -1) {
+                            byte[] tempdata = new byte[read];
+                            System.arraycopy(buffer, 0, tempdata, 0, read);
+                            publishProgress(tempdata);
+                            Log.i(TAG, "doInBackground: Got some data");
+                            read = nis.read(buffer, 0, 4096); //This is blocking
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+                Log.e(TAG, "doInBackground: Caught IOException");
+                result = true;
+            } catch (Exception e) {
+                e.printStackTrace();
+                Log.e(TAG, "doInBackground: Caught Exception");
+                result = true;
+            } finally {
+                try {
+                    nis.close();
+                    nos.close();
+                    socket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            return result;
+        }
+
+        @Override
+        protected void onPostExecute(Boolean result) {
+            Log.i(TAG, "onPostExecute of NetworkTask");
+            mServerButton.setText(R.string.start_server);
+            mServerButton.setClickable(true);
+        }
+
+        public void sendDataToNetwork(File file) {
+            try {
+                if(null != socket && socket.isConnected()) {
+                    FileInputStream fis = new FileInputStream(file);
+                    byte[] buf = new byte[1024];
+                    while ((fis.read(buf, 0, 1024)) != -1) {
+                        nos.write(buf);
+                    }
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "sendDataToNetwork: IOException");
+            }
+        }
+
+        public void sendStringToNetwork(String string) {
+            try {
+                if(null != socket && socket.isConnected()) {
+                    nos.write(string.getBytes());
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "sendStringToNetwork: IOException");
+            }
         }
     }
 
