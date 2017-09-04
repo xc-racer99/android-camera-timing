@@ -263,8 +263,6 @@ public class Camera2BasicFragment extends Fragment
 
         @Override
         public void onImageAvailable(ImageReader reader) {
-            Log.d(TAG, "I'm an image frame!");
-
             mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage(), mFile));
         }
 
@@ -485,6 +483,14 @@ public class Camera2BasicFragment extends Fragment
     public void onPause() {
         closeCamera();
         stopBackgroundThread();
+
+        // Close our sockets
+        if (networkTask != null) {
+            networkTask.closeSocket();
+            networkTask.onPostExecute(false);
+            networkTask = null;
+        }
+
         super.onPause();
     }
 
@@ -936,7 +942,9 @@ public class Camera2BasicFragment extends Fragment
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.picture: {
-                networkTask = new NetworkTask();
+                if(networkTask == null) {
+                    networkTask = new NetworkTask();
+                }
                 networkTask.execute();
                 break;
             }
@@ -1147,16 +1155,7 @@ public class Camera2BasicFragment extends Fragment
                 Log.e(TAG, "doInBackground: Caught Exception");
                 result = true;
             } finally {
-                try {
-                    if (nis != null)
-                        nis.close();
-                    if (nos != null)
-                        nos.close();
-                    if (socket != null)
-                        socket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                closeSocket();
             }
             return result;
         }
@@ -1166,6 +1165,19 @@ public class Camera2BasicFragment extends Fragment
             Log.i(TAG, "onPostExecute of NetworkTask");
             mServerButton.setText(R.string.start_server);
             mServerButton.setClickable(true);
+        }
+
+        protected void closeSocket() {
+            try {
+                if (nis != null)
+                    nis.close();
+                if (nos != null)
+                    nos.close();
+                if (socket != null)
+                    socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
         public void sendDataToNetwork(long timestamp, long numBytes, File file) {
