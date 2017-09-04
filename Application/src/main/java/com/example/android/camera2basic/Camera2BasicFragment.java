@@ -69,7 +69,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -958,7 +957,7 @@ public class Camera2BasicFragment extends Fragment
 
                     // Check if there's a client connected
                     String clientIp = new String();
-                    if (networkTask != null && networkTask.socket.isConnected()) {
+                    if (networkTask != null && networkTask.socket != null && networkTask.socket.isConnected()) {
                         clientIp = networkTask.socket.getRemoteSocketAddress().toString();
                     }
                     int ipAddress = wifiInfo.getIpAddress();
@@ -966,7 +965,7 @@ public class Camera2BasicFragment extends Fragment
                             .setMessage("IP: " + String.format("%d.%d.%d.%d",
                                     (ipAddress & 0xff),(ipAddress >> 8 & 0xff),
                                     (ipAddress >> 16 & 0xff),(ipAddress >> 24 & 0xff)) +
-                                    "Client: " + clientIp)
+                                    "\nClient: " + clientIp)
                             .setPositiveButton(android.R.string.ok, null)
                             .show();
                 }
@@ -1115,12 +1114,12 @@ public class Camera2BasicFragment extends Fragment
         return result;
     }
 
-    public class NetworkTask extends AsyncTask<Void, byte[], Boolean> {
+    private class NetworkTask extends AsyncTask<Void, byte[], Boolean> {
         private final int portNum = 54321;
-        protected ServerSocket listener;
-        Socket socket;
-        InputStream nis;
-        BufferedOutputStream nos;
+        private ServerSocket listener;
+        protected Socket socket;
+        private InputStream nis;
+        private BufferedOutputStream nos;
 
         @Override
         protected void onPreExecute(){
@@ -1195,10 +1194,18 @@ public class Camera2BasicFragment extends Fragment
                 if(null != socket && socket.isConnected()) {
                     nos.write(longToBytes(timestamp));
                     nos.write(longToBytes(numBytes));
+
+                    // Copy the file to a buffer that is half the size of file (because long.size/2=int.size)
                     FileInputStream fis = new FileInputStream(file);
-                    byte[] buf = new byte[1024];
-                    while ((fis.read(buf, 0, 1024)) != -1) {
+                    int bufSize = (int)(numBytes / 2);
+                    byte[] buf = new byte[bufSize];
+                    for(int i = 0; i < 2; i++) {
+                        fis.read(buf, 0, bufSize);
                         nos.write(buf);
+                    }
+                    // If we had an odd number, then there's still one byte to go
+                    if(numBytes % 2 != 0) {
+                        nos.write(fis.read());
                     }
                     nos.flush();
                 }
