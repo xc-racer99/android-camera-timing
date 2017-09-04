@@ -951,12 +951,22 @@ public class Camera2BasicFragment extends Fragment
             case R.id.info: {
                 Activity activity = getActivity();
                 if (null != activity) {
+                    // Get the IP of this device
                     Context context = getActivity().getApplicationContext();
                     WifiManager wifiMan = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
                     WifiInfo wifiInfo = wifiMan.getConnectionInfo();
+
+                    // Check if there's a client connected
+                    String clientIp = new String();
+                    if (networkTask != null && networkTask.socket.isConnected()) {
+                        clientIp = networkTask.socket.getRemoteSocketAddress().toString();
+                    }
                     int ipAddress = wifiInfo.getIpAddress();
                     new AlertDialog.Builder(activity)
-                            .setMessage("IP: " + String.format("%d.%d.%d.%d", (ipAddress & 0xff),(ipAddress >> 8 & 0xff),(ipAddress >> 16 & 0xff),(ipAddress >> 24 & 0xff)))
+                            .setMessage("IP: " + String.format("%d.%d.%d.%d",
+                                    (ipAddress & 0xff),(ipAddress >> 8 & 0xff),
+                                    (ipAddress >> 16 & 0xff),(ipAddress >> 24 & 0xff)) +
+                                    "Client: " + clientIp)
                             .setPositiveButton(android.R.string.ok, null)
                             .show();
                 }
