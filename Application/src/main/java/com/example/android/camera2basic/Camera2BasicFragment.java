@@ -63,6 +63,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.Toast;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -880,15 +881,10 @@ public class Camera2BasicFragment extends Fragment
                     Log.d(TAG, mFile.toString());
                     unlockFocus();
 
-                    // Send the timestamp
-                    networkTask.sendLongToNetwork(time);
-
-                    //Send the size of the file
                     long sizeBytes = mFile.length();
-                    networkTask.sendLongToNetwork(sizeBytes);
 
                     // Now send the actual file
-                    networkTask.sendDataToNetwork(mFile);
+                    networkTask.sendDataToNetwork(time, sizeBytes, mFile);
                 }
             };
 
@@ -1106,7 +1102,7 @@ public class Camera2BasicFragment extends Fragment
         protected ServerSocket listener;
         Socket socket;
         InputStream nis;
-        OutputStream nos;
+        BufferedOutputStream nos;
 
         @Override
         protected void onPreExecute(){
@@ -1127,7 +1123,7 @@ public class Camera2BasicFragment extends Fragment
                     if (socket.isConnected()) {
                         showToast(String.format("Client connected from: %s", socket.getRemoteSocketAddress().toString()));
                         nis = socket.getInputStream();
-                        nos = socket.getOutputStream();
+                        nos = new BufferedOutputStream(socket.getOutputStream());
                         Log.i(TAG, "doInBackground: Socket created, streams assigned");
                         Log.i(TAG, "doInBackground: Waiting for initial data");
 
@@ -1152,9 +1148,12 @@ public class Camera2BasicFragment extends Fragment
                 result = true;
             } finally {
                 try {
-                    nis.close();
-                    nos.close();
-                    socket.close();
+                    if (nis != null)
+                        nis.close();
+                    if (nos != null)
+                        nos.close();
+                    if (socket != null)
+                        socket.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -1169,29 +1168,21 @@ public class Camera2BasicFragment extends Fragment
             mServerButton.setClickable(true);
         }
 
-        public void sendDataToNetwork(File file) {
+        public void sendDataToNetwork(long timestamp, long numBytes, File file) {
             try {
                 if(null != socket && socket.isConnected()) {
+                    nos.write(longToBytes(timestamp));
+                    nos.write(longToBytes(numBytes));
                     FileInputStream fis = new FileInputStream(file);
                     byte[] buf = new byte[1024];
                     while ((fis.read(buf, 0, 1024)) != -1) {
                         nos.write(buf);
                     }
+                    nos.flush();
                 }
             } catch (IOException e) {
                 Log.e(TAG, "sendDataToNetwork: IOException");
             }
         }
-
-        public void sendLongToNetwork(long number) {
-            try {
-                if(null != socket && socket.isConnected()) {
-                    nos.write(longToBytes(number));
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "sendLongToNetwork: IOException");
-            }
-        }
     }
-
 }
