@@ -543,10 +543,10 @@ public class Camera2BasicFragment extends Fragment
 
                 // For still image captures, we use the largest available size.
                 Size largest = Collections.max(
-                        Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
+                        Arrays.asList(map.getOutputSizes(ImageFormat.YUV_420_888)),
                         new CompareSizesByArea());
                 mImageReader = ImageReader.newInstance(
-                        largest.getWidth() / 16, largest.getHeight() / 16, ImageFormat.JPEG, 2);
+                        largest.getWidth() / 16, largest.getHeight() / 16, ImageFormat.YUV_420_888, 2);
                 mImageReader.setOnImageAvailableListener(
                         mOnImageAvailableListener, mBackgroundHandler);
 
