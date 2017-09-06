@@ -46,8 +46,6 @@ public class CameraActivity extends Activity {
             case KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD:
             case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
             case KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD:
-            // FIXME - Remove Volume up - testing only
-            case KeyEvent.KEYCODE_VOLUME_UP:
                 Camera2BasicFragment fragment = (Camera2BasicFragment) getFragmentManager().findFragmentById(R.id.container);
                 fragment.takePicture();
                 return true;
