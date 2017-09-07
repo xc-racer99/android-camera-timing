@@ -487,6 +487,11 @@ public class Camera2BasicFragment extends Fragment
         // Close our sockets
         if (networkTask != null) {
             networkTask.closeSocket();
+            try {
+                networkTask.listener.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             networkTask.onPostExecute(false);
             networkTask = null;
         }
@@ -1155,7 +1160,6 @@ public class Camera2BasicFragment extends Fragment
                         }
                         showToast("Client disconnected");
                         closeSocket();
-                        return false;
                     }
                 }
             } catch (IOException e) {
