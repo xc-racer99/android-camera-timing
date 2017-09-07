@@ -77,6 +77,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -893,7 +894,7 @@ public class Camera2BasicFragment extends Fragment
                 }
             };
 
-            showToast(String.format("Time: %d", System.currentTimeMillis() - time));
+            showToast(String.format(Locale.US, "Time: %d", System.currentTimeMillis() - time));
 
             mCaptureSession.stopRepeating();
             mCaptureSession.capture(captureBuilder.build(), CaptureCallback, null);
@@ -956,13 +957,13 @@ public class Camera2BasicFragment extends Fragment
                     WifiInfo wifiInfo = wifiMan.getConnectionInfo();
 
                     // Check if there's a client connected
-                    String clientIp = new String();
+                    String clientIp = "";
                     if (networkTask != null && networkTask.socket != null && networkTask.socket.isConnected()) {
                         clientIp = networkTask.socket.getRemoteSocketAddress().toString();
                     }
                     int ipAddress = wifiInfo.getIpAddress();
                     new AlertDialog.Builder(activity)
-                            .setMessage("IP: " + String.format("%d.%d.%d.%d",
+                            .setMessage("IP: " + String.format(Locale.US, "%d.%d.%d.%d",
                                     (ipAddress & 0xff),(ipAddress >> 8 & 0xff),
                                     (ipAddress >> 16 & 0xff),(ipAddress >> 24 & 0xff)) +
                                     "\nClient: " + clientIp)
@@ -995,7 +996,7 @@ public class Camera2BasicFragment extends Fragment
          */
         private final File mFile;
 
-        public ImageSaver(Image image, File file) {
+        private ImageSaver(Image image, File file) {
             mImage = image;
             mFile = file;
         }
@@ -1028,7 +1029,7 @@ public class Camera2BasicFragment extends Fragment
     /**
      * Compares two {@code Size}s based on their areas.
      */
-    static class CompareSizesByArea implements Comparator<Size> {
+    private static class CompareSizesByArea implements Comparator<Size> {
 
         @Override
         public int compare(Size lhs, Size rhs) {
@@ -1117,7 +1118,7 @@ public class Camera2BasicFragment extends Fragment
     private class NetworkTask extends AsyncTask<Void, byte[], Boolean> {
         private final int portNum = 54321;
         private ServerSocket listener;
-        protected Socket socket;
+        private Socket socket;
         private InputStream nis;
         private BufferedOutputStream nos;
 
@@ -1130,7 +1131,6 @@ public class Camera2BasicFragment extends Fragment
 
         @Override
         protected Boolean doInBackground(Void... params) {
-            boolean result = false;
             try {
                 listener = new ServerSocket(portNum);
                 Log.d(TAG, String.format("Listening on port %d", portNum));
@@ -1155,20 +1155,19 @@ public class Camera2BasicFragment extends Fragment
                         }
                         showToast("Client disconnected");
                         closeSocket();
+                        return false;
                     }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
                 Log.e(TAG, "doInBackground: Caught IOException");
-                result = true;
             } catch (Exception e) {
                 e.printStackTrace();
                 Log.e(TAG, "doInBackground: Caught Exception");
-                result = true;
             } finally {
                 closeSocket();
             }
-            return result;
+            return true;
         }
 
         @Override
@@ -1178,7 +1177,7 @@ public class Camera2BasicFragment extends Fragment
             mServerButton.setClickable(true);
         }
 
-        protected void closeSocket() {
+        private void closeSocket() {
             try {
                 if (nis != null)
                     nis.close();
@@ -1191,7 +1190,7 @@ public class Camera2BasicFragment extends Fragment
             }
         }
 
-        public void sendDataToNetwork(long timestamp, long numBytes, File file) {
+        private void sendDataToNetwork(long timestamp, long numBytes, File file) {
             try {
                 if(null != socket && socket.isConnected()) {
                     nos.write(longToBytes(timestamp));
