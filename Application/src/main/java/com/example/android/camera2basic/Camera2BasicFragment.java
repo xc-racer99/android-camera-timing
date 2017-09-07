@@ -1153,6 +1153,7 @@ public class Camera2BasicFragment extends Fragment
                             Log.i(TAG, "doInBackground: Got some data");
                             read = nis.read(buffer, 0, 4096); //This is blocking
                         }
+                        showToast("Client disconnected");
                     }
                 }
             } catch (IOException e) {
