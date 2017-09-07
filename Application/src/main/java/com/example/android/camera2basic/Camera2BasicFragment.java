@@ -1154,6 +1154,7 @@ public class Camera2BasicFragment extends Fragment
                             read = nis.read(buffer, 0, 4096); //This is blocking
                         }
                         showToast("Client disconnected");
+                        closeSocket();
                     }
                 }
             } catch (IOException e) {
