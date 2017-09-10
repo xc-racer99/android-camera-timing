@@ -49,6 +49,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v13.app.FragmentCompat;
 import android.support.v4.content.ContextCompat;
@@ -455,6 +456,12 @@ public class Camera2BasicFragment extends Fragment
         mServerButton.setOnClickListener(this);
         view.findViewById(R.id.info).setOnClickListener(this);
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
+
+        // If auto-rotate is not enabled, tell user orientation will be messed up
+        if(android.provider.Settings.System.getInt(getActivity().getContentResolver(),
+                Settings.System.ACCELEROMETER_ROTATION, 0) == 0) {
+            showToast("Please enable auto-rotate otherwise the orientation in pictures will be incorrect");
+        }
     }
 
     @Override
