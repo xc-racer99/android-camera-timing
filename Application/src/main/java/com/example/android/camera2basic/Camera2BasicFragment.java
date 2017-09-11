@@ -189,6 +189,11 @@ public class Camera2BasicFragment extends Fragment
     private Rect mZoomRect;
 
     /**
+     * Spinner that holds the zoom level desired
+     */
+    private Spinner zoomSpinner;
+
+    /**
      * ID of the current {@link CameraDevice}.
      */
     private String mCameraId;
@@ -469,7 +474,7 @@ public class Camera2BasicFragment extends Fragment
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
 
         // Initialize the zoom spinner
-        Spinner zoomSpinner = (Spinner) view.findViewById(R.id.zoom_spinner);
+        zoomSpinner = (Spinner) view.findViewById(R.id.zoom_spinner);
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
                 getActivity().getApplicationContext(), R.array.zoom_array, android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -633,8 +638,8 @@ public class Camera2BasicFragment extends Fragment
                         Log.e(TAG, "Display rotation is invalid: " + displayRotation);
                 }
 
-                // Initialize the zoom factor to 1
-                changeZoomFactor(1.0);
+                // Adjust the zoom factor
+                spinnerPositionToZoomFactor(zoomSpinner.getSelectedItemPosition());
 
                 Point displaySize = new Point();
                 activity.getWindowManager().getDefaultDisplay().getSize(displaySize);
@@ -996,6 +1001,8 @@ public class Camera2BasicFragment extends Fragment
             mState = STATE_PREVIEW;
             mCaptureSession.setRepeatingRequest(mPreviewRequest, mCaptureCallback,
                     mBackgroundHandler);
+            // Adjust the zoom factor
+            spinnerPositionToZoomFactor(zoomSpinner.getSelectedItemPosition());
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -1039,31 +1046,35 @@ public class Camera2BasicFragment extends Fragment
     }
 
     public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-            switch(pos) {
-                case 0:
-                    // Zoom factor of 1
-                    changeZoomFactor(1.0);
-                    break;
-                case 1:
-                    // Zoom factor of 1.25
-                    changeZoomFactor(1.25);
-                    break;
-                case 2:
-                    // Zoom factor of 1.5
-                    changeZoomFactor(1.5);
-                    break;
-                case 3:
-                    // Zoom factor of 1.75
-                    changeZoomFactor(1.75);
-                    break;
-                case 4:
-                    // Zoom factor to 2
-                    changeZoomFactor(2.0);
-                    break;
-                default:
-                    // Should never reach here, but set zoom factor to 1
-                    changeZoomFactor(1.0);
-            }
+        spinnerPositionToZoomFactor(pos);
+    }
+
+    public void spinnerPositionToZoomFactor(int pos) {
+        switch(pos) {
+            case 0:
+                // Zoom factor of 1
+                changeZoomFactor(1.0);
+                break;
+            case 1:
+                // Zoom factor of 1.25
+                changeZoomFactor(1.25);
+                break;
+            case 2:
+                // Zoom factor of 1.5
+                changeZoomFactor(1.5);
+                break;
+            case 3:
+                // Zoom factor of 1.75
+                changeZoomFactor(1.75);
+                break;
+            case 4:
+                // Zoom factor to 2
+                changeZoomFactor(2.0);
+                break;
+            default:
+                // Should never reach here, but set zoom factor to 1
+                changeZoomFactor(1.0);
+        }
     }
 
     public void onNothingSelected(AdapterView<?> parent) {
