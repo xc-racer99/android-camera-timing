@@ -24,6 +24,7 @@ import android.app.DialogFragment;
 import android.app.Fragment;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.ImageFormat;
@@ -1221,6 +1222,9 @@ public class Camera2BasicFragment extends Fragment
             Log.i(TAG, "onPreExecute of NetworkTask");
             mServerButton.setText(R.string.server_running);
             mServerButton.setClickable(false);
+
+            // Lock the orientation
+            getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
         }
 
         @Override
@@ -1268,6 +1272,9 @@ public class Camera2BasicFragment extends Fragment
             Log.i(TAG, "onPostExecute of NetworkTask");
             mServerButton.setText(R.string.start_server);
             mServerButton.setClickable(true);
+
+            // Unlock the orientation
+            getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         }
 
         private void closeSocket() {
