@@ -29,6 +29,7 @@ import android.content.res.Configuration;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -61,7 +62,10 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.Toast;
 
 import java.io.BufferedOutputStream;
@@ -83,7 +87,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 public class Camera2BasicFragment extends Fragment
-        implements View.OnClickListener, FragmentCompat.OnRequestPermissionsResultCallback {
+        implements View.OnClickListener, FragmentCompat.OnRequestPermissionsResultCallback,
+        AdapterView.OnItemSelectedListener {
 
     /**
      * Conversion from screen rotation to JPEG orientation.
@@ -176,6 +181,11 @@ public class Camera2BasicFragment extends Fragment
      * Asynchronous network server
      */
     protected NetworkTask networkTask;
+
+    /**
+     * Rect that holds the zoom of the image
+     */
+    private Rect mZoomRect;
 
     /**
      * ID of the current {@link CameraDevice}.
@@ -457,6 +467,15 @@ public class Camera2BasicFragment extends Fragment
         view.findViewById(R.id.info).setOnClickListener(this);
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
 
+        // Initialize the zoom spinner
+        Spinner zoomSpinner = (Spinner) view.findViewById(R.id.zoom_spinner);
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
+                getActivity().getApplicationContext(), R.array.zoom_array, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        zoomSpinner.setAdapter(adapter);
+        zoomSpinner.setOnItemSelectedListener(this);
+        mZoomRect = new Rect();
+
         // If auto-rotate is not enabled, tell user orientation will be messed up
         if(android.provider.Settings.System.getInt(getActivity().getContentResolver(),
                 Settings.System.ACCELEROMETER_ROTATION, 0) == 0) {
@@ -528,6 +547,33 @@ public class Camera2BasicFragment extends Fragment
         }
     }
 
+    private void changeZoomFactor(double factor) {
+        if(mCameraId != null && mCaptureSession != null && mPreviewRequestBuilder != null)
+            try {
+                CameraManager manager = (CameraManager) getActivity().getSystemService(Context.CAMERA_SERVICE);
+                CameraCharacteristics characteristics = manager.getCameraCharacteristics(mCameraId);
+
+                Rect maxSize = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+                int maxWidth = maxSize.width();
+                int maxHeight = maxSize.height();
+
+                int left = (maxWidth - (int)((float)maxWidth/factor))/2;
+                int top = (maxHeight - (int)((float)maxHeight/factor))/2;
+                int right = maxWidth - left;
+                int bottom = maxHeight - top;
+
+                mZoomRect.set(left, top, right, bottom);
+
+                // Set the preview zoom, the taking picture zoom is in takeStillPicture()
+                mPreviewRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, mZoomRect);
+                mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), mCaptureCallback,
+                        null);
+            } catch (CameraAccessException e) {
+                e.printStackTrace();
+            }
+
+    }
+
     /**
      * Sets up member variables related to camera.
      *
@@ -585,6 +631,9 @@ public class Camera2BasicFragment extends Fragment
                     default:
                         Log.e(TAG, "Display rotation is invalid: " + displayRotation);
                 }
+
+                // Initialize the zoom factor to 1
+                changeZoomFactor(1.0);
 
                 Point displaySize = new Point();
                 activity.getWindowManager().getDefaultDisplay().getSize(displaySize);
@@ -878,6 +927,7 @@ public class Camera2BasicFragment extends Fragment
             final CaptureRequest.Builder captureBuilder =
                     mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
             captureBuilder.addTarget(mImageReader.getSurface());
+            captureBuilder.set(CaptureRequest.SCALER_CROP_REGION, mZoomRect);
 
             // Use the same AE and AF modes as the preview.
             captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,
@@ -985,6 +1035,38 @@ public class Camera2BasicFragment extends Fragment
                 break;
             }
         }
+    }
+
+    public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
+            switch(pos) {
+                case 0:
+                    // Zoom factor of 1
+                    changeZoomFactor(1.0);
+                    break;
+                case 1:
+                    // Zoom factor of 1.25
+                    changeZoomFactor(1.25);
+                    break;
+                case 2:
+                    // Zoom factor of 1.5
+                    changeZoomFactor(1.5);
+                    break;
+                case 3:
+                    // Zoom factor of 1.75
+                    changeZoomFactor(1.75);
+                    break;
+                case 4:
+                    // Zoom factor to 2
+                    changeZoomFactor(2.0);
+                    break;
+                default:
+                    // Should never reach here, but set zoom factor to 1
+                    changeZoomFactor(1.0);
+            }
+    }
+
+    public void onNothingSelected(AdapterView<?> parent) {
+
     }
 
     private void setAutoFlash(CaptureRequest.Builder requestBuilder) {
