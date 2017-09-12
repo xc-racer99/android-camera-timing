@@ -154,7 +154,33 @@ public class Camera2BasicFragment extends Fragment
 
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
-            openCamera(width, height);
+            if(mWidth == 0 && mHeight == 0) {
+                mTextureWidth = width;
+                mTextureHeight = height;
+                // Prompt for quality
+                AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+                AlertDialog levelDialog;
+                builder.setTitle("Select Camera Quality");
+                builder.setSingleChoiceItems(R.array.camera_qualities, 3,
+                        new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int item) {
+                                setPreferredSize(item);
+                            }
+                        });
+                builder.setPositiveButton(android.R.string.ok,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                openCamera();
+                            }
+                        });
+                builder.setCancelable(false);
+                levelDialog = builder.create();
+                levelDialog.show();
+            } else {
+                // We've already got a desired resolution, just open the camera
+                openCamera();
+            }
         }
 
         @Override
@@ -323,6 +349,23 @@ public class Camera2BasicFragment extends Fragment
     private long time;
 
     /**
+     * Preferred width of image captures
+     */
+    private int mWidth = 0;
+
+    /**
+     * Preferred height of image captures
+     */
+    private int mHeight = 0;
+
+    /**
+     * Size of the preview texture
+     */
+    private int mTextureWidth;
+    private int mTextureHeight;
+
+
+    /**
      * A {@link CameraCaptureSession.CaptureCallback} that handles events related to JPEG capture.
      */
     private CameraCaptureSession.CaptureCallback mCaptureCallback
@@ -404,6 +447,31 @@ public class Camera2BasicFragment extends Fragment
                     Toast.makeText(activity, text, Toast.LENGTH_SHORT).show();
                 }
             });
+        }
+    }
+
+    /**
+     * Converts the position of the array to
+     */
+    protected void setPreferredSize(int index) {
+        switch(index) {
+            case 0:
+                mWidth = 2048;
+                mHeight = 1536;
+                break;
+            case 1:
+                mWidth = 1024;
+                mHeight = 768;
+                break;
+            case 2:
+                mWidth = 720;
+                mHeight = 540;
+                break;
+            case 3:
+            default:
+                mWidth = 640;
+                mHeight = 480;
+                break;
         }
     }
 
@@ -505,7 +573,9 @@ public class Camera2BasicFragment extends Fragment
         // a camera and start preview from here (otherwise, we wait until the surface is ready in
         // the SurfaceTextureListener).
         if (mTextureView.isAvailable()) {
-            openCamera(mTextureView.getWidth(), mTextureView.getHeight());
+            mTextureWidth = mTextureView.getWidth();
+            mTextureHeight = mTextureView.getHeight();
+            openCamera();
         } else {
             mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
         }
@@ -606,11 +676,13 @@ public class Camera2BasicFragment extends Fragment
                     continue;
                 }
 
-                // For still image captures, we use the largest available size.
+                // Pick our size of image
+                Size[] sizes = map.getOutputSizes(ImageFormat.JPEG);
                 Size largest = Collections.max(
-                        Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
+                        Arrays.asList(sizes),
                         new CompareSizesByArea());
-                mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
+                Size wanted = chooseOptimalSize(sizes, mWidth, mHeight, largest.getWidth(), largest.getHeight(), largest);
+                mImageReader = ImageReader.newInstance(wanted.getWidth(), wanted.getHeight(),
                         ImageFormat.JPEG, /*maxImages*/6);
                 mImageReader.setOnImageAvailableListener(
                         mOnImageAvailableListener, mBackgroundHandler);
@@ -700,14 +772,14 @@ public class Camera2BasicFragment extends Fragment
     /**
      * Opens the camera specified by {@link Camera2BasicFragment#mCameraId}.
      */
-    private void openCamera(int width, int height) {
+    private void openCamera() {
         if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             requestCameraPermission();
             return;
         }
-        setUpCameraOutputs(width, height);
-        configureTransform(width, height);
+        setUpCameraOutputs(mTextureWidth, mTextureHeight);
+        configureTransform(mTextureWidth, mTextureHeight);
         Activity activity = getActivity();
         CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
         try {
