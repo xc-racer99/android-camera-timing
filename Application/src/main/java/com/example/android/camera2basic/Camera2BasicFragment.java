@@ -392,6 +392,8 @@ public class Camera2BasicFragment extends Fragment
                         } else {
                             runPrecaptureSequence();
                         }
+                    } else {
+                        runPrecaptureSequence();
                     }
                     break;
                 }
