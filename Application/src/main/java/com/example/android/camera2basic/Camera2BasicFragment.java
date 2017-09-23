@@ -207,7 +207,7 @@ public class Camera2BasicFragment extends Fragment
     /**
      * Asynchronous network server
      */
-    protected NetworkTask networkTask;
+    protected static NetworkTask networkTask;
 
     /**
      * Rect that holds the zoom of the image
@@ -1022,11 +1022,6 @@ public class Camera2BasicFragment extends Fragment
                     showToast("Saved: " + mFile);
                     Log.d(TAG, mFile.toString());
                     unlockFocus();
-
-                    long sizeBytes = mFile.length();
-
-                    // Now send the actual file
-                    networkTask.sendDataToNetwork(time, sizeBytes, mFile);
                 }
             };
 
@@ -1191,6 +1186,10 @@ public class Camera2BasicFragment extends Fragment
                 if (null != output) {
                     try {
                         output.close();
+                        long sizeBytes = mFile.length();
+
+                        // Now send the actual file
+                        networkTask.sendDataToNetwork(sizeBytes, mFile);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -1369,8 +1368,14 @@ public class Camera2BasicFragment extends Fragment
             }
         }
 
-        private void sendDataToNetwork(long timestamp, long numBytes, File file) {
+        private void sendDataToNetwork(long numBytes, File file) {
             try {
+                long timestamp = 0;
+                String[] parts = file.getName().split("\\.(?=[^\\.]+$)");
+                if(parts.length > 0) {
+                    timestamp = Long.parseLong(parts[0]);
+                }
+
                 if(null != socket && socket.isConnected()) {
                     nos.write(longToBytes(timestamp));
                     nos.write(longToBytes(numBytes));
