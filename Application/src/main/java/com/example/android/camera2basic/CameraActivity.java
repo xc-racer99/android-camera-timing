@@ -40,6 +40,9 @@ public class CameraActivity extends Activity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent keyEvent) {
+        // If this is the 4th or higher event with it being released, discard it
+        if(keyEvent.getRepeatCount() >= 4)
+            return true;
         switch (keyCode) {
             case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_UP:
