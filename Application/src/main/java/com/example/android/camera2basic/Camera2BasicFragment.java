@@ -530,6 +530,30 @@ public class Camera2BasicFragment extends Fragment
     }
 
     @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // Retain this fragment across configuration changes.
+        setRetainInstance(true);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        // Close our sockets
+        if (networkTask != null) {
+            networkTask.closeSocket();
+            try {
+                networkTask.listener.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            networkTask.onPostExecute(false);
+            networkTask = null;
+        }
+    }
+
+    @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_camera2_basic, container, false);
@@ -539,6 +563,12 @@ public class Camera2BasicFragment extends Fragment
     public void onViewCreated(final View view, Bundle savedInstanceState) {
         mServerButton = (Button) view.findViewById(R.id.picture);
         mServerButton.setOnClickListener(this);
+        // If the server is already started, set the correct text
+        if(networkTask != null) {
+            mServerButton.setText(R.string.server_running);
+            mServerButton.setClickable(false);
+        }
+
         view.findViewById(R.id.info).setOnClickListener(this);
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
 
@@ -586,18 +616,6 @@ public class Camera2BasicFragment extends Fragment
     public void onPause() {
         closeCamera();
         stopBackgroundThread();
-
-        // Close our sockets
-        if (networkTask != null) {
-            networkTask.closeSocket();
-            try {
-                networkTask.listener.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            networkTask.onPostExecute(false);
-            networkTask = null;
-        }
 
         super.onPause();
     }
