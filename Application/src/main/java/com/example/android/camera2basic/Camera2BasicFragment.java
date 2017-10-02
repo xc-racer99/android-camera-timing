@@ -153,34 +153,33 @@ public class Camera2BasicFragment extends Fragment
 
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
-            if(mWidth == 0 && mHeight == 0) {
+            if(!qualityPicked) {
                 mTextureWidth = width;
                 mTextureHeight = height;
                 // Prompt for quality
-                if(!qualityPicked) {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-                    AlertDialog levelDialog;
-                    builder.setTitle("Select Camera Quality");
-                    builder.setSingleChoiceItems(R.array.camera_qualities, 3,
-                            new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int item) {
-                                    setPreferredSize(item);
+                AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+                AlertDialog levelDialog;
+                builder.setTitle("Select Camera Quality");
+                builder.setSingleChoiceItems(R.array.camera_qualities, 3,
+                        new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int item) {setPreferredSize(item);
                                 }
                             });
-                    builder.setPositiveButton(android.R.string.ok,
-                            new DialogInterface.OnClickListener() {
+                builder.setPositiveButton(android.R.string.ok,
+                        new DialogInterface.OnClickListener() {
                                 @Override
                                 public void onClick(DialogInterface dialog, int which) {
                                     openCamera();
                                 }
                             });
-                    builder.setCancelable(false);
-                    levelDialog = builder.create();
-                    levelDialog.show();
-                    qualityPicked = true;
-                }
+                builder.setCancelable(false);
+                levelDialog = builder.create();
+                levelDialog.show();
+                qualityPicked = true;
             } else {
                 // We've already got a desired resolution, just open the camera
+                mTextureWidth = width;
+                mTextureHeight = height;
                 openCamera();
             }
         }
