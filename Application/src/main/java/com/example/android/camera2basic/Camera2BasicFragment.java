@@ -157,25 +157,28 @@ public class Camera2BasicFragment extends Fragment
                 mTextureWidth = width;
                 mTextureHeight = height;
                 // Prompt for quality
-                AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-                AlertDialog levelDialog;
-                builder.setTitle("Select Camera Quality");
-                builder.setSingleChoiceItems(R.array.camera_qualities, 3,
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int item) {
-                                setPreferredSize(item);
-                            }
-                        });
-                builder.setPositiveButton(android.R.string.ok,
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                openCamera();
-                            }
-                        });
-                builder.setCancelable(false);
-                levelDialog = builder.create();
-                levelDialog.show();
+                if(!qualityPicked) {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+                    AlertDialog levelDialog;
+                    builder.setTitle("Select Camera Quality");
+                    builder.setSingleChoiceItems(R.array.camera_qualities, 3,
+                            new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int item) {
+                                    setPreferredSize(item);
+                                }
+                            });
+                    builder.setPositiveButton(android.R.string.ok,
+                            new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    openCamera();
+                                }
+                            });
+                    builder.setCancelable(false);
+                    levelDialog = builder.create();
+                    levelDialog.show();
+                    qualityPicked = true;
+                }
             } else {
                 // We've already got a desired resolution, just open the camera
                 openCamera();
@@ -356,6 +359,11 @@ public class Camera2BasicFragment extends Fragment
      * Preferred height of image captures
      */
     private int mHeight = 0;
+
+    /**
+     * Have we already picked the quality?
+     */
+    private boolean qualityPicked = false;
 
     /**
      * Size of the preview texture
