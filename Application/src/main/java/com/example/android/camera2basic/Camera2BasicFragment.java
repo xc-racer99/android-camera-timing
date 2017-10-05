@@ -1099,9 +1099,7 @@ public class Camera2BasicFragment extends Fragment
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.picture: {
-                if(networkTask == null) {
-                    networkTask = new NetworkTask();
-                }
+                networkTask = new NetworkTask();
                 networkTask.execute();
                 break;
             }
