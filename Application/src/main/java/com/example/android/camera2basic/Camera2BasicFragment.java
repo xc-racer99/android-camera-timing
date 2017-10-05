@@ -1379,6 +1379,8 @@ public class Camera2BasicFragment extends Fragment
                     nos.close();
                 if (socket != null)
                     socket.close();
+                if(listener != null)
+                    listener.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
