@@ -160,9 +160,10 @@ public class Camera2BasicFragment extends Fragment
                 AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
                 AlertDialog levelDialog;
                 builder.setTitle("Select Camera Quality");
-                builder.setSingleChoiceItems(R.array.camera_qualities, 3,
+                builder.setSingleChoiceItems(R.array.camera_qualities, 0,
                         new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int item) {setPreferredSize(item);
+                                public void onClick(DialogInterface dialog, int item) {
+                                    mPreferredSize = item;
                                 }
                             });
                 builder.setPositiveButton(android.R.string.ok,
@@ -350,14 +351,9 @@ public class Camera2BasicFragment extends Fragment
     private long time;
 
     /**
-     * Preferred width of image captures
+     * Index of preferred quality - 0 = highest, 1 = medium, 2 = lowest
      */
-    private int mWidth = 0;
-
-    /**
-     * Preferred height of image captures
-     */
-    private int mHeight = 0;
+    private int mPreferredSize;
 
     /**
      * Have we already picked the quality?
@@ -455,31 +451,6 @@ public class Camera2BasicFragment extends Fragment
                     Toast.makeText(activity, text, Toast.LENGTH_SHORT).show();
                 }
             });
-        }
-    }
-
-    /**
-     * Converts the position of the array to
-     */
-    protected void setPreferredSize(int index) {
-        switch(index) {
-            case 0:
-                mWidth = 2048;
-                mHeight = 1536;
-                break;
-            case 1:
-                mWidth = 1024;
-                mHeight = 768;
-                break;
-            case 2:
-                mWidth = 720;
-                mHeight = 540;
-                break;
-            case 3:
-            default:
-                mWidth = 640;
-                mHeight = 480;
-                break;
         }
     }
 
@@ -707,7 +678,17 @@ public class Camera2BasicFragment extends Fragment
                 Size largest = Collections.max(
                         Arrays.asList(sizes),
                         new CompareSizesByArea());
-                Size wanted = chooseOptimalSize(sizes, mWidth, mHeight, largest.getWidth(), largest.getHeight(), largest);
+                Size wanted;
+                if(mPreferredSize == 0) {
+                    // Highest quality
+                    wanted = largest;
+                } else if(mPreferredSize == 1) {
+                    // Medium quality, approx half of high quality
+                    wanted = chooseOptimalSize(sizes, largest.getWidth() / 2, largest.getHeight() / 2, largest.getWidth(), largest.getHeight(), largest);
+                } else {
+                    // Lowest quality
+                    wanted = Collections.min(Arrays.asList(sizes), new CompareSizesByArea());
+                }
                 mImageReader = ImageReader.newInstance(wanted.getWidth(), wanted.getHeight(),
                         ImageFormat.JPEG, /*maxImages*/6);
                 mImageReader.setOnImageAvailableListener(

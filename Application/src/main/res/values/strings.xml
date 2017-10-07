@@ -22,10 +22,9 @@
 
     <string name="camera_quality">Choose quality</string>
     <string-array name="camera_qualities">
-        <item>Very High (2048x1536)</item>
-        <item>High (1080x810)</item>
-        <item>Medium (720x540)</item>
-        <item>Low (640x480)</item>
+        <item>Highest</item>
+        <item>Medium</item>
+        <item>Lowest</item>
     </string-array>
     
     <string-array name="zoom_array">
