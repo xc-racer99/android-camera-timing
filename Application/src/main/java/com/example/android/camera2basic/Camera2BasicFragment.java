@@ -520,6 +520,7 @@ public class Camera2BasicFragment extends Fragment
         super.onDestroy();
         // Close our sockets
         if (networkTask != null) {
+            networkTask.programClosing = true;
             networkTask.closeSocket();
             try {
                 networkTask.listener.close();
@@ -1293,6 +1294,7 @@ public class Camera2BasicFragment extends Fragment
 
     private class NetworkTask extends AsyncTask<Void, byte[], Boolean> {
         private final int portNum = 54321;
+        private boolean programClosing = false;
         private ServerSocket listener;
         private Socket socket;
         private InputStream nis;
@@ -1350,6 +1352,8 @@ public class Camera2BasicFragment extends Fragment
             Log.i(TAG, "onPostExecute of NetworkTask");
             mServerButton.setText(R.string.start_server);
             mServerButton.setClickable(true);
+            if(!programClosing)
+                mServerButton.callOnClick();
         }
 
         private void closeSocket() {
