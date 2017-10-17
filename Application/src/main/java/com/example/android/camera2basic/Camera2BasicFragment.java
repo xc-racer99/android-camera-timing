@@ -786,6 +786,10 @@ public class Camera2BasicFragment extends Fragment
                                 // Flash is automatically enabled when necessary.
                                 setAutoFlash(mPreviewRequestBuilder);
 
+                                // Set to sports mode
+                                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_SCENE_MODE,
+                                        CaptureRequest.CONTROL_SCENE_MODE_SPORTS);
+
                                 // Finally, we start displaying the camera preview.
                                 mPreviewRequest = mPreviewRequestBuilder.build();
                                 mCaptureSession.setRepeatingRequest(mPreviewRequest,
