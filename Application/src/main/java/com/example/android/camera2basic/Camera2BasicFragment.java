@@ -33,6 +33,7 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
+import android.hardware.SensorManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -42,6 +43,7 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.ExifInterface;
 import android.media.ImageReader;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
@@ -49,7 +51,6 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v13.app.FragmentCompat;
 import android.support.v4.content.ContextCompat;
@@ -57,6 +58,7 @@ import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.LayoutInflater;
+import android.view.OrientationEventListener;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
@@ -308,6 +310,11 @@ public class Camera2BasicFragment extends Fragment
     private int mTextureWidth;
     private int mTextureHeight;
 
+    /**
+     * Physical orientation of the device
+     */
+    private int mOrientation = 0;
+
 
     /**
      * A {@link CameraCaptureSession.CaptureCallback} that handles events related to JPEG capture.
@@ -409,6 +416,23 @@ public class Camera2BasicFragment extends Fragment
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Listen for orientation changes
+        OrientationEventListener listener = new OrientationEventListener (getActivity().getApplicationContext(),
+                SensorManager.SENSOR_DELAY_NORMAL) {
+            public void onOrientationChanged (int orientation) {
+                if(orientation > 315 && orientation < 45)
+                    mOrientation = ExifInterface.ORIENTATION_UNDEFINED;
+                else if(orientation >= 45 && orientation <= 135)
+                    mOrientation = ExifInterface.ORIENTATION_ROTATE_90;
+                else if(orientation > 135 && orientation <= 225)
+                    mOrientation = ExifInterface.ORIENTATION_ROTATE_180;
+                else if(orientation > 225 && orientation <= 315)
+                    mOrientation = ExifInterface.ORIENTATION_ROTATE_270;
+                Log.v (TAG, "onOrientationChanged " + mOrientation + " " + orientation);
+            }
+        };
+        listener.enable();
+
         // Retain this fragment across configuration changes.
         setRetainInstance(true);
     }
@@ -457,12 +481,6 @@ public class Camera2BasicFragment extends Fragment
         zoomSpinner.setAdapter(adapter);
         zoomSpinner.setOnItemSelectedListener(this);
         mZoomRect = new Rect();
-
-        // If auto-rotate is not enabled, tell user orientation will be messed up
-        if(android.provider.Settings.System.getInt(getActivity().getContentResolver(),
-                Settings.System.ACCELEROMETER_ROTATION, 0) == 0) {
-            showToast("Please enable auto-rotate otherwise the orientation in pictures will be incorrect");
-        }
     }
 
     @Override
@@ -831,6 +849,7 @@ public class Camera2BasicFragment extends Fragment
         float centerX = viewRect.centerX();
         float centerY = viewRect.centerY();
         if (Surface.ROTATION_90 == rotation || Surface.ROTATION_270 == rotation) {
+
             bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
             matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
             float scale = Math.max(
@@ -863,6 +882,11 @@ public class Camera2BasicFragment extends Fragment
         try {
             output = new FileOutputStream(mFile);
             pic.compress(Bitmap.CompressFormat.JPEG, 95, output);
+
+            // Fix orientation
+            ExifInterface exif = new ExifInterface(mFile.getAbsolutePath());
+            exif.setAttribute(ExifInterface.TAG_ORIENTATION, Integer.toString(mOrientation));
+            exif.saveAttributes();
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
