@@ -174,36 +174,9 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
 
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
-            if(!qualityPicked) {
-                mTextureWidth = width;
-                mTextureHeight = height;
-                // Prompt for quality
-                AlertDialog.Builder builder = new AlertDialog.Builder(CameraActivity.this);
-                AlertDialog levelDialog;
-                builder.setTitle("Select Camera Quality");
-                builder.setSingleChoiceItems(R.array.camera_qualities, 0,
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int item) {
-                                mPreferredSize = item;
-                            }
-                        });
-                builder.setPositiveButton(android.R.string.ok,
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                openCamera();
-                            }
-                        });
-                builder.setCancelable(false);
-                levelDialog = builder.create();
-                levelDialog.show();
-                qualityPicked = true;
-            } else {
-                // We've already got a desired resolution, just open the camera
-                mTextureWidth = width;
-                mTextureHeight = height;
-                openCamera();
-            }
+            mTextureWidth = width;
+            mTextureHeight = height;
+            openCamera();
         }
 
         @Override
@@ -336,16 +309,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
      * Whether the current camera device supports Flash or not.
      */
     private boolean mFlashSupported;
-
-    /**
-     * Index of preferred quality - 0 = highest, 1 = medium, 2 = lowest
-     */
-    private int mPreferredSize;
-
-    /**
-     * Have we already picked the quality?
-     */
-    private boolean qualityPicked = false;
 
     /**
      * Size of the preview texture
@@ -486,15 +449,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         super.onPause();
     }
 
-    private void requestCameraPermission() {
-        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
-            Toast.makeText(this, "We need access to the Camera to take pictures", Toast.LENGTH_LONG).show();
-        } else {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA},
-                    REQUEST_CAMERA_PERMISSION);
-        }
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
@@ -621,18 +575,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                 // Danger, W.R.! Attempting to use too large a preview size could  exceed the camera
                 // bus' bandwidth limitation, resulting in gorgeous previews but the storage of
                 // garbage capture data.
-                if(mPreferredSize == 0) {
-                    mPreviewSize = largest;
-                } else if(mPreferredSize == 1) {
-                    mPreviewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
-                            rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
-                            maxPreviewHeight, largest);
-                } else {
-                    // Lowest quality
-                    mPreviewSize = Collections.min(
-                            Arrays.asList(sizes),
-                            new CompareSizesByArea());
-                }
+                mPreviewSize = largest;
 
                 // We fit the aspect ratio of TextureView to the size of preview we picked.
                 int orientation = getResources().getConfiguration().orientation;
@@ -667,7 +610,8 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
     private void openCamera() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
-            requestCameraPermission();
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA},
+                    REQUEST_CAMERA_PERMISSION);
             return;
         }
         setUpCameraOutputs(mTextureWidth, mTextureHeight);
