@@ -130,18 +130,51 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         mZoomRect = new Rect();
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
 
-        listener.enable();
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        // Close our sockets
+        if (networkTask != null) {
+            networkTask.programClosing = true;
+            networkTask.closeSocket();
+            try {
+                networkTask.listener.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            networkTask.onPostExecute(false);
+            networkTask = null;
+        }
     }
 
     @Override
-    protected void onStop() {
-        super.onStop();
+    public void onResume() {
+        super.onResume();
+        startBackgroundThread();
 
+        listener.enable();
+
+        // When the screen is turned off and turned back on, the SurfaceTexture is already
+        // available, and "onSurfaceTextureAvailable" will not be called. In that case, we can open
+        // a camera and start preview from here (otherwise, we wait until the surface is ready in
+        // the SurfaceTextureListener).
+        if (mTextureView.isAvailable()) {
+            mTextureWidth = mTextureView.getWidth();
+            mTextureHeight = mTextureView.getHeight();
+            openCamera();
+        } else {
+            mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        closeCamera();
+        stopBackgroundThread();
         listener.disable();
+
+        super.onPause();
     }
 
     /**
@@ -402,49 +435,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
             Log.e(TAG, "Couldn't find any suitable preview size");
             return choices[0];
         }
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        // Close our sockets
-        if (networkTask != null) {
-            networkTask.programClosing = true;
-            networkTask.closeSocket();
-            try {
-                networkTask.listener.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            networkTask.onPostExecute(false);
-            networkTask = null;
-        }
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        startBackgroundThread();
-
-        // When the screen is turned off and turned back on, the SurfaceTexture is already
-        // available, and "onSurfaceTextureAvailable" will not be called. In that case, we can open
-        // a camera and start preview from here (otherwise, we wait until the surface is ready in
-        // the SurfaceTextureListener).
-        if (mTextureView.isAvailable()) {
-            mTextureWidth = mTextureView.getWidth();
-            mTextureHeight = mTextureView.getHeight();
-            openCamera();
-        } else {
-            mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
-        }
-    }
-
-    @Override
-    public void onPause() {
-        closeCamera();
-        stopBackgroundThread();
-
-        super.onPause();
     }
 
     @Override
