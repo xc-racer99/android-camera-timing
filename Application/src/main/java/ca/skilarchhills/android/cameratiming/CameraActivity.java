@@ -349,15 +349,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
     };
 
     /**
-     * Shows a {@link Toast} on the UI thread.
-     *
-     * @param text The message to show
-     */
-    private void showToast(final String text) {
-                    Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
-    }
-
-    /**
      * Given {@code choices} of {@code Size}s supported by a camera, choose the smallest one that
      * is at least as large as the respective texture view size, and that is at most as large as the
      * respective max size, and whose aspect ratio matches with the specified value. If such size
@@ -454,7 +445,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                                            @NonNull int[] grantResults) {
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
             if (grantResults.length != 1 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, R.string.request_permission, Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "This app requires the Camera permission.  Exiting.", Toast.LENGTH_LONG).show();
                 finish();
             }
         } else {
@@ -733,7 +724,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                         @Override
                         public void onConfigureFailed(
                                 @NonNull CameraCaptureSession cameraCaptureSession) {
-                            showToast("Failed");
+                            Toast.makeText(getApplicationContext(), "Failed to configure camera!", Toast.LENGTH_SHORT).show();
                         }
                     }, null
             );
@@ -780,8 +771,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
      */
     public void takePicture() {
         if (networkTask == null) {
-            showToast("Start server first before taking a picture");
-            return;
+            Toast.makeText(this, "Server not started, won't be able to sync file", Toast.LENGTH_SHORT).show();
         }
 
         long time = System.currentTimeMillis();
@@ -808,14 +798,15 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                     long sizeBytes = mFile.length();
 
                     // Now send the actual file
-                    networkTask.sendDataToNetwork(sizeBytes, mFile);
+                    if(networkTask != null)
+                        networkTask.sendDataToNetwork(sizeBytes, mFile);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
         }
 
-        showToast(String.format(Locale.US, "Time: %d", System.currentTimeMillis() - time));
+        Toast.makeText(this, String.format(Locale.US, "Time: %d", System.currentTimeMillis() - time), Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -942,7 +933,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                     Log.d(TAG, "Waiting for client to connect");
                     socket = listener.accept();
                     if (socket.isConnected()) {
-                        showToast(String.format("Client connected from: %s", socket.getRemoteSocketAddress().toString()));
                         nis = socket.getInputStream();
                         nos = new BufferedOutputStream(socket.getOutputStream());
                         Log.i(TAG, "doInBackground: Socket created, streams assigned");
@@ -957,7 +947,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                             Log.i(TAG, "doInBackground: Got some data");
                             read = nis.read(buffer, 0, 4096); //This is blocking
                         }
-                        showToast("Client disconnected");
                         closeSocket();
                     }
                 }
