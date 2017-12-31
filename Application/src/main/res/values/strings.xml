@@ -17,15 +17,6 @@
     <string name="start_server">Start Server</string>
     <string name="server_running">Server Running</string>
     <string name="description_info">Info</string>
-    <string name="request_permission">This sample needs camera permission.</string>
-    <string name="camera_error">This device doesn\'t support Camera2 API.</string>
-
-    <string name="camera_quality">Choose quality</string>
-    <string-array name="camera_qualities">
-        <item>Highest</item>
-        <item>Medium</item>
-        <item>Lowest</item>
-    </string-array>
     
     <string-array name="zoom_array">
         <item>1.00x</item>
