@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.example.android.camera2basic;
+package ca.skilarchhills.android.cameratiming;
 
 import android.Manifest;
 import android.app.Activity;

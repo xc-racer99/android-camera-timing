@@ -13,9 +13,9 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-package com.example.android.camera2basic.tests;
+package ca.skilarchhills.android.cameratiming.tests;
 
-import com.example.android.camera2basic.*;
+import ca.skilarchhills.android.cameratiming.*;
 
 import android.test.ActivityInstrumentationTestCase2;
 
