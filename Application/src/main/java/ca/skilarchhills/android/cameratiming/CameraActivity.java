@@ -19,11 +19,7 @@ package ca.skilarchhills.android.cameratiming;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.Dialog;
-import android.app.DialogFragment;
-import android.app.Fragment;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -53,18 +49,15 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
 import android.support.v13.app.ActivityCompat;
-import android.support.v13.app.FragmentCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.KeyEvent;
-import android.view.LayoutInflater;
 import android.view.OrientationEventListener;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -91,6 +84,8 @@ import java.util.concurrent.TimeUnit;
 
 public class CameraActivity extends Activity implements View.OnClickListener, AdapterView.OnItemSelectedListener {
 
+    OrientationEventListener listener;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -100,7 +95,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         // Listen for orientation changes
-        OrientationEventListener listener = new OrientationEventListener (getApplicationContext(),
+        listener = new OrientationEventListener (getApplicationContext(),
                 SensorManager.SENSOR_DELAY_NORMAL) {
             public void onOrientationChanged (int orientation) {
                 if(orientation > 315 && orientation < 45)
@@ -113,7 +108,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                     mOrientation = ExifInterface.ORIENTATION_ROTATE_270;
             }
         };
-        listener.enable();
 
         mServerButton = (Button) findViewById(R.id.picture);
         mServerButton.setOnClickListener(this);
@@ -136,12 +130,25 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         mZoomRect = new Rect();
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        listener.enable();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+
+        listener.disable();
+    }
+
     /**
      * Conversion from screen rotation to JPEG orientation.
      */
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     private static final int REQUEST_CAMERA_PERMISSION = 1;
-    private static final String FRAGMENT_DIALOG = "dialog";
 
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 90);
@@ -153,7 +160,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
     /**
      * Tag for the {@link Log}.
      */
-    private static final String TAG = "Camera2BasicFragment";
+    private static final String TAG = "CameraTimingForAndroid";
 
     /**
      * Max preview width that is guaranteed by Camera2 API
