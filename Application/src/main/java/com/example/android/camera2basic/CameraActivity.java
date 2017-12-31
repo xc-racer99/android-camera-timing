@@ -104,14 +104,13 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                 SensorManager.SENSOR_DELAY_NORMAL) {
             public void onOrientationChanged (int orientation) {
                 if(orientation > 315 && orientation < 45)
-                    mOrientation = ExifInterface.ORIENTATION_UNDEFINED;
+                    mOrientation = ExifInterface.ORIENTATION_NORMAL;
                 else if(orientation >= 45 && orientation <= 135)
                     mOrientation = ExifInterface.ORIENTATION_ROTATE_90;
                 else if(orientation > 135 && orientation <= 225)
                     mOrientation = ExifInterface.ORIENTATION_ROTATE_180;
                 else if(orientation > 225 && orientation <= 315)
                     mOrientation = ExifInterface.ORIENTATION_ROTATE_270;
-                Log.v (TAG, "onOrientationChanged " + mOrientation + " " + orientation);
             }
         };
         listener.enable();
