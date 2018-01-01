@@ -47,6 +47,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.v13.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -77,8 +78,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Queue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -111,11 +114,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
 
         mServerButton = (Button) findViewById(R.id.picture);
         mServerButton.setOnClickListener(this);
-        // If the server is already started, set the correct text
-        if(networkTask != null) {
-            mServerButton.setText(R.string.server_running);
-            mServerButton.setClickable(false);
-        }
 
         findViewById(R.id.info).setOnClickListener(this);
         mTextureView = (AutoFitTextureView) findViewById(R.id.texture);
@@ -130,28 +128,13 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         mZoomRect = new Rect();
     }
 
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        // Close our sockets
-        if (networkTask != null) {
-            networkTask.programClosing = true;
-            networkTask.closeSocket();
-            try {
-                networkTask.listener.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            networkTask.onPostExecute(false);
-            networkTask = null;
-        }
-    }
-
     @Override
     public void onResume() {
         super.onResume();
         startBackgroundThread();
+
+        // Start our server
+        mServerButton.callOnClick();
 
         listener.enable();
 
@@ -173,6 +156,11 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         closeCamera();
         stopBackgroundThread();
         listener.disable();
+
+        // Close our sockets
+        if (networkTask != null) {
+            networkTask.programClosing = true;
+        }
 
         super.onPause();
     }
@@ -238,7 +226,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
     /**
      * Button used to start the server
      */
-    protected Button mServerButton;
+    protected static Button mServerButton;
 
     /**
      * Asynchronous network server
@@ -796,7 +784,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
 
                     // Now send the actual file
                     if(networkTask != null)
-                        networkTask.sendDataToNetwork(sizeBytes, mFile);
+                        networkTask.queue.add(mFile);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -821,9 +809,9 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
 
                     // Check if there's a client connected
                     String clientIp = "";
-                    if (networkTask != null && networkTask.socket != null && networkTask.socket.isConnected()) {
-                        clientIp = networkTask.socket.getRemoteSocketAddress().toString();
-                    }
+                    if(networkTask != null)
+                        clientIp = networkTask.getClientIp();
+
                     int ipAddress = wifiInfo.getIpAddress();
                     new AlertDialog.Builder(this)
                             .setMessage("IP: " + String.format(Locale.US, "%d.%d.%d.%d",
@@ -906,13 +894,14 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         return result;
     }
 
-    private class NetworkTask extends AsyncTask<Void, byte[], Boolean> {
+    private static class NetworkTask extends AsyncTask<Void, byte[], Boolean> {
         private final int portNum = 54321;
         private boolean programClosing = false;
         private ServerSocket listener;
         private Socket socket;
         private InputStream nis;
         private BufferedOutputStream nos;
+        Queue<File> queue = new LinkedList<>();
 
         @Override
         protected void onPreExecute(){
@@ -926,25 +915,47 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
             try {
                 listener = new ServerSocket(portNum);
                 Log.d(TAG, String.format("Listening on port %d", portNum));
-                while(true) {
-                    Log.d(TAG, "Waiting for client to connect");
-                    socket = listener.accept();
-                    if (socket.isConnected()) {
-                        nis = socket.getInputStream();
-                        nos = new BufferedOutputStream(socket.getOutputStream());
-                        Log.i(TAG, "doInBackground: Socket created, streams assigned");
-                        Log.i(TAG, "doInBackground: Waiting for initial data");
+                Log.d(TAG, "Waiting for client to connect");
+                socket = listener.accept();
+                if (socket.isConnected()) {
+                    nis = socket.getInputStream();
+                    nos = new BufferedOutputStream(socket.getOutputStream());
+                    Log.i(TAG, "doInBackground: Socket created, streams assigned");
+                    Log.i(TAG, "doInBackground: Waiting for initial data");
 
-                        byte[] buffer = new byte[4096];
-                        int read = nis.read(buffer, 0, 4096); //This is blocking
-                        while(read != -1) {
-                            byte[] tempdata = new byte[read];
-                            System.arraycopy(buffer, 0, tempdata, 0, read);
-                            publishProgress(tempdata);
-                            Log.i(TAG, "doInBackground: Got some data");
-                            read = nis.read(buffer, 0, 4096); //This is blocking
+                    File file;
+                    while (null != socket && socket.isConnected() && !programClosing) {
+                        file = queue.poll();
+                        if (file == null) {
+                            SystemClock.sleep(2000);
+                            continue;
                         }
-                        closeSocket();
+
+                        Log.v(TAG, "doInBackground: Sending file");
+
+                        long numBytes = file.length();
+                        long timestamp = 0;
+                        String[] parts = file.getName().split("\\.(?=[^\\.]+$)");
+                        if (parts.length > 0) {
+                            timestamp = Long.parseLong(parts[0]);
+                        }
+
+                        nos.write(longToBytes(timestamp));
+                        nos.write(longToBytes(numBytes));
+
+                        // Copy the file to a buffer that is half the size of file (because long.size/2=int.size)
+                        FileInputStream fis = new FileInputStream(file);
+                        int bufSize = (int) (numBytes / 2);
+                        byte[] buf = new byte[bufSize];
+                        for (int i = 0; i < 2; i++) {
+                            fis.read(buf, 0, bufSize);
+                            nos.write(buf);
+                        }
+                        // If we had an odd number, then there's still one byte to go
+                        if (numBytes % 2 != 0) {
+                            nos.write(fis.read());
+                        }
+                        nos.flush();
                     }
                 }
             } catch (IOException e) {
@@ -962,10 +973,18 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         @Override
         protected void onPostExecute(Boolean result) {
             Log.i(TAG, "onPostExecute of NetworkTask");
+            closeSocket();
             mServerButton.setText(R.string.start_server);
             mServerButton.setClickable(true);
             if(!programClosing)
                 mServerButton.callOnClick();
+        }
+
+        private String getClientIp() {
+            if(socket != null)
+                return socket.getRemoteSocketAddress().toString();
+            else
+                return "";
         }
 
         private void closeSocket() {
@@ -980,37 +999,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                     listener.close();
             } catch (IOException e) {
                 e.printStackTrace();
-            }
-        }
-
-        private void sendDataToNetwork(long numBytes, File file) {
-            try {
-                long timestamp = 0;
-                String[] parts = file.getName().split("\\.(?=[^\\.]+$)");
-                if(parts.length > 0) {
-                    timestamp = Long.parseLong(parts[0]);
-                }
-
-                if(null != socket && socket.isConnected()) {
-                    nos.write(longToBytes(timestamp));
-                    nos.write(longToBytes(numBytes));
-
-                    // Copy the file to a buffer that is half the size of file (because long.size/2=int.size)
-                    FileInputStream fis = new FileInputStream(file);
-                    int bufSize = (int)(numBytes / 2);
-                    byte[] buf = new byte[bufSize];
-                    for(int i = 0; i < 2; i++) {
-                        fis.read(buf, 0, bufSize);
-                        nos.write(buf);
-                    }
-                    // If we had an odd number, then there's still one byte to go
-                    if(numBytes % 2 != 0) {
-                        nos.write(fis.read());
-                    }
-                    nos.flush();
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "sendDataToNetwork: IOException");
             }
         }
     }
