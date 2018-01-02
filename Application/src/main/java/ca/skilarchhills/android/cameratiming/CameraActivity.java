@@ -19,7 +19,10 @@ package ca.skilarchhills.android.cameratiming;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -43,11 +46,10 @@ import android.media.ExifInterface;
 import android.media.ImageReader;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.SystemClock;
+import android.os.IBinder;
 import android.support.annotation.NonNull;
 import android.support.v13.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -62,30 +64,21 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.Toast;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Locale;
-import java.util.Queue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-public class CameraActivity extends Activity implements View.OnClickListener, AdapterView.OnItemSelectedListener {
+public class CameraActivity extends Activity implements View.OnClickListener, AdapterView.OnItemSelectedListener, ServiceConnection {
 
     OrientationEventListener listener;
 
@@ -112,14 +105,11 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
             }
         };
 
-        mServerButton = (Button) findViewById(R.id.picture);
-        mServerButton.setOnClickListener(this);
-
         findViewById(R.id.info).setOnClickListener(this);
-        mTextureView = (AutoFitTextureView) findViewById(R.id.texture);
+        mTextureView = findViewById(R.id.texture);
 
         // Initialize the zoom spinner
-        zoomSpinner = (Spinner) findViewById(R.id.zoom_spinner);
+        zoomSpinner = findViewById(R.id.zoom_spinner);
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
                 getApplicationContext(), R.array.zoom_array, android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -134,7 +124,22 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         startBackgroundThread();
 
         // Start our server
-        mServerButton.callOnClick();
+        Intent intent= new Intent(this, SocketService.class);
+
+        // Add all the files already existing
+        File[] initialPics = getExternalFilesDir(null).listFiles(new FilenameFilter() {
+            public boolean accept(File directory, String fileName) {
+                return fileName.matches("\\d+\\.jpg");
+            }
+        });
+        String[] fileNames = new String[initialPics.length];
+        for(int i = 0; i < initialPics.length; i++) {
+            fileNames[i] = initialPics[i].getAbsolutePath();
+        }
+        intent.putExtra(SocketService.initialPicsTag, fileNames);
+
+        // Bind to SocketService
+        bindService(intent, this, Context.BIND_AUTO_CREATE);
 
         listener.enable();
 
@@ -157,12 +162,10 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         stopBackgroundThread();
         listener.disable();
 
-        // Close our sockets
-        if (networkTask != null) {
-            networkTask.programClosing = true;
-        }
-
         super.onPause();
+
+        // Unbind socket
+        unbindService(this);
     }
 
     /**
@@ -224,14 +227,9 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
     };
 
     /**
-     * Button used to start the server
-     */
-    protected static Button mServerButton;
-
-    /**
      * Asynchronous network server
      */
-    protected static NetworkTask networkTask;
+    private SocketService networkService;
 
     /**
      * Rect that holds the zoom of the image
@@ -521,7 +519,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         } catch (NullPointerException e) {
             // Currently an NPE is thrown when the Camera2API is used but not supported on the
             // device this code runs.
-            Toast.makeText(this, "Camera2 API not supported on this device!  This app will not work", Toast.LENGTH_LONG);
+            Toast.makeText(this, "Camera2 API not supported on this device!  This app will not work", Toast.LENGTH_LONG).show();
             finish();
         }
     }
@@ -701,7 +699,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
      * Initiate a still image capture.
      */
     public void takePicture() {
-        if (networkTask == null) {
+        if (networkService == null || !networkService.isConnected()) {
             Toast.makeText(this, "Server not started, won't be able to sync file", Toast.LENGTH_SHORT).show();
         }
 
@@ -726,9 +724,10 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
             if (null != output) {
                 try {
                     output.close();
-                    // Now send the actual file
-                    if(networkTask != null)
-                        networkTask.queue.add(mFile);
+                    // Now send the actual file to the service
+                    Intent service = new Intent(getApplicationContext(), SocketService.class);
+                    service.putExtra(SocketService.picsTag, mFile.getAbsolutePath());
+                    getApplicationContext().startService(service);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -739,13 +738,20 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
     }
 
     @Override
+    public void onServiceConnected(ComponentName name, IBinder binder) {
+        SocketService.MyBinder b = (SocketService.MyBinder) binder;
+        networkService = b.getService();
+        Toast.makeText(CameraActivity.this, "Connected to service", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onServiceDisconnected(ComponentName name) {
+        networkService = null;
+    }
+
+    @Override
     public void onClick(View view) {
         switch (view.getId()) {
-            case R.id.picture: {
-                networkTask = new NetworkTask();
-                networkTask.execute();
-                break;
-            }
             case R.id.info: {
                     // Get the IP of this device
                     WifiManager wifiMan = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
@@ -753,8 +759,8 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
 
                     // Check if there's a client connected
                     String clientIp = "";
-                    if(networkTask != null)
-                        clientIp = networkTask.getClientIp();
+                    if(networkService != null)
+                        clientIp = networkService.getClientIp();
 
                     int ipAddress = wifiInfo.getIpAddress();
                     new AlertDialog.Builder(this)
@@ -822,128 +828,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
             // We cast here to ensure the multiplications won't overflow
             return Long.signum((long) lhs.getWidth() * lhs.getHeight() -
                     (long) rhs.getWidth() * rhs.getHeight());
-        }
-
-    }
-
-    /**
-     * Helper function to convert a long to a byte[]
-     */
-    public static byte[] longToBytes(long l) {
-        byte[] result = new byte[8];
-        for (int i = 7; i >= 0; i--) {
-            result[i] = (byte)(l & 0xFF);
-            l >>= 8;
-        }
-        return result;
-    }
-
-    private static class NetworkTask extends AsyncTask<Void, byte[], Boolean> {
-        private final int portNum = 54321;
-        private boolean programClosing = false;
-        private ServerSocket listener;
-        private Socket socket;
-        private InputStream nis;
-        private BufferedOutputStream nos;
-        Queue<File> queue = new LinkedList<>();
-
-        @Override
-        protected void onPreExecute(){
-            Log.i(TAG, "onPreExecute of NetworkTask");
-            mServerButton.setText(R.string.server_running);
-            mServerButton.setClickable(false);
-        }
-
-        @Override
-        protected Boolean doInBackground(Void... params) {
-            try {
-                listener = new ServerSocket(portNum);
-                Log.d(TAG, String.format("Listening on port %d", portNum));
-                Log.d(TAG, "Waiting for client to connect");
-                socket = listener.accept();
-                if (socket.isConnected()) {
-                    nis = socket.getInputStream();
-                    nos = new BufferedOutputStream(socket.getOutputStream());
-                    Log.i(TAG, "doInBackground: Socket created, streams assigned");
-                    Log.i(TAG, "doInBackground: Waiting for initial data");
-
-                    File file;
-                    while (null != socket && socket.isConnected() && !programClosing) {
-                        file = queue.poll();
-                        if (file == null) {
-                            SystemClock.sleep(2000);
-                            continue;
-                        }
-
-                        Log.v(TAG, "doInBackground: Sending file");
-
-                        long numBytes = file.length();
-                        long timestamp = 0;
-                        String[] parts = file.getName().split("\\.(?=[^\\.]+$)");
-                        if (parts.length > 0) {
-                            timestamp = Long.parseLong(parts[0]);
-                        }
-
-                        nos.write(longToBytes(timestamp));
-                        nos.write(longToBytes(numBytes));
-
-                        // Copy the file to a buffer that is half the size of file (because long.size/2=int.size)
-                        FileInputStream fis = new FileInputStream(file);
-                        int bufSize = (int) (numBytes / 2);
-                        byte[] buf = new byte[bufSize];
-                        for (int i = 0; i < 2; i++) {
-                            fis.read(buf, 0, bufSize);
-                            nos.write(buf);
-                        }
-                        // If we had an odd number, then there's still one byte to go
-                        if (numBytes % 2 != 0) {
-                            nos.write(fis.read());
-                        }
-                        nos.flush();
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                Log.e(TAG, "doInBackground: Caught IOException");
-            } catch (Exception e) {
-                e.printStackTrace();
-                Log.e(TAG, "doInBackground: Caught Exception");
-            } finally {
-                closeSocket();
-            }
-            return true;
-        }
-
-        @Override
-        protected void onPostExecute(Boolean result) {
-            Log.i(TAG, "onPostExecute of NetworkTask");
-            closeSocket();
-            mServerButton.setText(R.string.start_server);
-            mServerButton.setClickable(true);
-            if(!programClosing)
-                mServerButton.callOnClick();
-        }
-
-        private String getClientIp() {
-            if(socket != null)
-                return socket.getRemoteSocketAddress().toString();
-            else
-                return "";
-        }
-
-        private void closeSocket() {
-            try {
-                if (nis != null)
-                    nis.close();
-                if (nos != null)
-                    nos.close();
-                if (socket != null)
-                    socket.close();
-                if(listener != null)
-                    listener.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
     }
 
