@@ -845,7 +845,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         private Socket socket;
         private InputStream nis;
         private BufferedOutputStream nos;
-        Queue<File> queue = new LinkedList<>();
+        private LinkedList<File> queue = new LinkedList<>();
 
         @Override
         protected void onPreExecute(){
@@ -868,7 +868,11 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                     Log.i(TAG, "doInBackground: Waiting for initial data");
 
                     File file;
-                    while (null != socket && socket.isConnected() && !programClosing) {
+                    while (null != socket && socket.isConnected() && !socket.isClosed() && !programClosing) {
+                        // Make sure we can contact our client, if not, then break
+                        if(!socket.getInetAddress().isReachable(2000))
+                            break;
+
                         file = queue.poll();
                         if (file == null) {
                             SystemClock.sleep(2000);
@@ -892,11 +896,21 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                         int bufSize = (int) (numBytes / 2);
                         byte[] buf = new byte[bufSize];
                         for (int i = 0; i < 2; i++) {
+                            if(!socket.getInetAddress().isReachable(2000)) {
+                                queue.addFirst(file);
+                                break;
+                            }
+
                             fis.read(buf, 0, bufSize);
                             nos.write(buf);
                         }
                         // If we had an odd number, then there's still one byte to go
                         if (numBytes % 2 != 0) {
+                            if(!socket.getInetAddress().isReachable(2000)) {
+                                queue.addFirst(file);
+                                break;
+                            }
+
                             nos.write(fis.read());
                         }
                         nos.flush();
@@ -908,16 +922,14 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
             } catch (Exception e) {
                 e.printStackTrace();
                 Log.e(TAG, "doInBackground: Caught Exception");
-            } finally {
-                closeSocket();
             }
+            closeSocket();
             return true;
         }
 
         @Override
         protected void onPostExecute(Boolean result) {
             Log.i(TAG, "onPostExecute of NetworkTask");
-            closeSocket();
             mServerButton.setText(R.string.start_server);
             mServerButton.setClickable(true);
             if(!programClosing)
