@@ -105,9 +105,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
             }
         };
 
-        mServerButton = findViewById(R.id.picture);
-        mServerButton.setOnClickListener(this);
-
         findViewById(R.id.info).setOnClickListener(this);
         mTextureView = findViewById(R.id.texture);
 
@@ -215,11 +212,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         }
 
     };
-
-    /**
-     * Button used to start the server
-     */
-    protected Button mServerButton;
 
     /**
      * Asynchronous network server
@@ -747,10 +739,6 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
     @Override
     public void onClick(View view) {
         switch (view.getId()) {
-            case R.id.picture: {
-                //
-                break;
-            }
             case R.id.info: {
                     // Get the IP of this device
                     WifiManager wifiMan = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);

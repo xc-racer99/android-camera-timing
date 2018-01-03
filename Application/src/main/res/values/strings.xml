@@ -14,8 +14,6 @@
  limitations under the License.
 -->
 <resources>
-    <string name="start_server">Start Server</string>
-    <string name="server_running">Server Running</string>
     <string name="description_info">Info</string>
     
     <string-array name="zoom_array">

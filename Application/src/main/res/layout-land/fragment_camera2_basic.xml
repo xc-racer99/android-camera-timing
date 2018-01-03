@@ -42,13 +42,6 @@
             android:layout_gravity="center_horizontal|top"
             android:paddingTop="10dp" />
 
-        <Button
-            android:id="@+id/picture"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="@string/start_server" />
-
         <ImageButton
             android:id="@+id/info"
             style="@android:style/Widget.Material.Light.Button.Borderless"
