@@ -72,11 +72,6 @@ public class SocketService extends Service {
     }
 
     @Override
-    public void onDestroy() {
-        serviceClosing = true;
-    }
-
-    @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // Used to add an additional picture
         String nextPic = intent.getStringExtra(picsTag);
@@ -109,6 +104,14 @@ public class SocketService extends Service {
     @Override
     public boolean onUnbind (Intent intent) {
         serviceClosing = true;
+
+        if (listener != null && socket == null) {
+            try {
+                listener.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
         return false;
     }
 
