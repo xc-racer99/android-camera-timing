@@ -195,11 +195,11 @@ public class SocketService extends Service {
 
     /**
      * Waits for the PC to acknowledge receipt of the packet
-     * Returns true if ACK received, false if times out
+     * Returns true if ACK received, false otherwise
      */
     private boolean waitForAck() {
         int ret = (int)readLong();
-        Log.e(TAG, "Read " + ret);
+        Log.v(TAG, "Read " + ret);
         return ret == PC_ACK;
     }
 
@@ -282,7 +282,7 @@ public class SocketService extends Service {
                 while (socket.isConnected() && !socket.isClosed() && !serviceClosing) {
                     // Read next command from PC
                     long cmd = readLong();
-                    Log.d(TAG, "Read " + cmd);
+                    Log.v(TAG, "Read " + cmd);
                     if(cmd == -1) {
                         // Error reading data
                         Log.e(TAG, "Failed to read command from computer");
@@ -347,18 +347,22 @@ public class SocketService extends Service {
             Log.e(TAG, "doInBackground: Caught Exception");
         } finally {
             closeSocket();
-            startNetwork();
+            if(!serviceClosing)
+                startNetwork();
         }
     }
 
     /* Closes the socket and associated streams */
     private void closeSocket() {
         try {
-            if (nis != null)
+            if(nis != null)
                 nis.close();
-            nos.close();
-            socket.close();
-            listener.close();
+            if(nos != null)
+                nos.close();
+            if(socket != null)
+                socket.close();
+            if(listener != null)
+                listener.close();
         } catch(IOException e){
             e.printStackTrace();
         }
