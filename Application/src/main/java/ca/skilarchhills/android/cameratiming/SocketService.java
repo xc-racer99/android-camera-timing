@@ -62,8 +62,8 @@ public class SocketService extends Service {
     private WifiManager wifiMan;
 
     // Contains all of the images we know of
-    private CopyOnWriteArrayList<String> queue = new CopyOnWriteArrayList<>();
-    private int nextIndex = -1;
+    private ArrayList<String> queue = new ArrayList<>();
+    private int nextIndex;
 
     @Override
     public void onCreate() {
@@ -104,11 +104,20 @@ public class SocketService extends Service {
         if(initialPics != null && initialPics.length > 0)
             Collections.addAll(queue, initialPics);
 
-        nextIndex = queue.size() - 1;
+        if(queue.size() == 0)
+            nextIndex = 0;
+        else
+            nextIndex = queue.size() - 1;
 
         Log.d(TAG, "onBind run");
 
         return mBinder;
+    }
+
+    @Override
+    public boolean onUnbind (Intent intent) {
+        serviceClosing = true;
+        return false;
     }
 
     public class MyBinder extends Binder {
@@ -177,25 +186,46 @@ public class SocketService extends Service {
      * @return next 8 bytes as long from socket, or -1 on error
      */
     private long readLong() {
+
+        //FIXME Have some sort of timeout for if we don't receive 8 bytes
+
+        Log.e(TAG, "Reading long");
+
         int bytesRead = 0;
+        int temp;
         byte[] buffer = new byte[8];
 
         try {
-            while (nis.available() < 8) {
-                SystemClock.sleep(50);
-                if (!socket.getInetAddress().isReachable(2000))
-                    return -1;
-            }
-
-            // We now have at least 8 bytes, hopefully
-            bytesRead = nis.read(buffer);
-            if(bytesRead != 8) {
-                // Shouldn't happen...
+            if (!socket.getInetAddress().isReachable(2000)) {
+                Log.e(TAG, "Not reachable");
                 return -1;
             }
+
+            /* Try reading */
+            /*
+            while(nis.available() < 8) {
+                Log.e(TAG, "Bytes available is " + nis.available());
+                SystemClock.sleep(50);
+            }
+            */
+
+            while (bytesRead < 8) {
+                temp = nis.read();
+                if(temp == -1) {
+                    Log.e(TAG, "Read -1 reading long");
+                    return -1;
+                }
+                buffer[bytesRead++] = (byte)temp;
+            }
+
+            Log.e(TAG, "Read long");
+
             return bytesToLong(buffer);
         } catch (IOException e) {
             e.printStackTrace();
+
+            Log.e(TAG, "Read long - caught exception");
+
             return -1;
         }
     }
@@ -206,16 +236,8 @@ public class SocketService extends Service {
      */
     private boolean waitForAck() {
         int ret = (int)readLong();
+        Log.e(TAG, "Read " + ret);
         return ret == PC_ACK;
-    }
-
-    /**
-     * Sends an error over the network stream
-     * Returns true if successfully sent data, false if IO Error
-     */
-    private boolean sendError(int error) {
-        // FIXME - Implement
-        return true;
     }
 
     /**
@@ -228,6 +250,8 @@ public class SocketService extends Service {
         try {
             Log.v(TAG, "Sending file");
 
+            int bufsize = 4096;
+            byte[] buffer = new byte[bufsize];
             long numBytes = file.length();
             long timestamp = 0;
             String[] parts = file.getName().split("\\.(?=[^\\.]+$)");
@@ -242,24 +266,24 @@ public class SocketService extends Service {
 
             // Copy the file to a buffer that is half the size of file (because long.size/2=int.size)
             FileInputStream fis = new FileInputStream(file);
-            int bufSize = (int) (numBytes / 2);
-            byte[] buf = new byte[bufSize];
-            for (int i = 0; i < 2; i++) {
-                if (!socket.getInetAddress().isReachable(2000)) {
-                    return false;
-                }
 
-                if (fis.read(buf, 0, bufSize) != -1)
-                    nos.write(buf);
-            }
-            // If we had an odd number, then there's still one byte to go
-            if (numBytes % 2 != 0) {
-                if (!socket.getInetAddress().isReachable(2000)) {
+            for(int i = 0; i < numBytes / bufsize; i++) {
+                if(!socket.getInetAddress().isReachable(2000))
                     return false;
-                }
-
-                nos.write(fis.read());
+                if(fis.read(buffer, 0, bufsize) == -1)
+                    return false;
+                else
+                    nos.write(buffer);
             }
+
+            // Write remaining bytes
+            int remain = (int)(numBytes % bufsize);
+            if(fis.read(buffer, 0, remain) == -1)
+                return false;
+            else
+                nos.write(buffer, 0, remain);
+
+            fis.close();
             nos.flush();
         } catch (IOException e) {
             e.printStackTrace();
@@ -289,34 +313,35 @@ public class SocketService extends Service {
                 int fileIndex = -1;
 
                 while (socket.isConnected() && !socket.isClosed() && !serviceClosing) {
-                    // Make sure we can contact our client, if not, then break
-                    if(!socket.getInetAddress().isReachable(2000))
-                        break;
-
-                    // Read 8 command from PC
+                    // Read next command from PC
                     long cmd = readLong();
+                    Log.d(TAG, "Read " + cmd);
                     if(cmd == -1) {
                         // Error reading data
+                        Log.e(TAG, "Failed to read command from computer");
                         break;
                     }
 
                     File file;
                     switch((int)cmd) {
+                        // FIXME check return code of waitForAck and actually break while loop if necessary
                         case PC_REQUEST_NEXT:
-                            while(queue.isEmpty()) {
-                                SystemClock.sleep(2000);
-                                if(!socket.getInetAddress().isReachable(2000))
-                                    break;
+                            Log.e(TAG, "Got here 0");
+                            if(nextIndex >= queue.size() || queue.size() == 0) {
+                                Log.e(TAG, "Got here 0.1");
+                                nos.write(longToBytes(NO_DATA));
+                                nos.flush();
+                                waitForAck();
+                                continue;
                             }
-                            fileIndex = nextIndex;
-                            file = new File(queue.get(nextIndex));
+                            fileIndex = nextIndex++;
+                            file = new File(queue.get(fileIndex));
                             break;
                         case PC_REQUEST_SPECIFIC:
                             int index = (int)readLong();
                             if(queue.size() - 1 > index) {
-                                sendError(NO_DATA);
+                                nos.write(longToBytes(NO_DATA));
                                 waitForAck();
-                                continue;
                             }
                             fileIndex = index;
                             file = new File(queue.get(index));
@@ -324,7 +349,7 @@ public class SocketService extends Service {
                         case PC_REQUEST_ALL:
                         default:
                             // Not implemented
-                            sendError(NOT_IMPLEMENTED);
+                            nos.write(longToBytes(NOT_IMPLEMENTED));
                             waitForAck();
                             continue;
                     }
@@ -339,22 +364,37 @@ public class SocketService extends Service {
                         break;
                 }
 
-                // Close socket
-                if (nis != null)
-                    nis.close();
-                nos.close();
-                socket.close();
-                listener.close();
+                closeSocket();
             }
 
-            // Stop the service
-            stopSelf();
+            if(serviceClosing) {
+                Log.d(TAG, "Service closing");
+                stopSelf();
+            } else {
+                startNetwork();
+            }
         } catch (IOException e) {
             e.printStackTrace();
             Log.e(TAG, "doInBackground: Caught IOException");
         } catch (Exception e) {
             e.printStackTrace();
             Log.e(TAG, "doInBackground: Caught Exception");
+        } finally {
+            closeSocket();
+            startNetwork();
+        }
+    }
+
+    /* Closes the socket and associated streams */
+    private void closeSocket() {
+        try {
+            if (nis != null)
+                nis.close();
+            nos.close();
+            socket.close();
+            listener.close();
+        } catch(IOException e){
+            e.printStackTrace();
         }
     }
 
