@@ -292,9 +292,7 @@ public class SocketService extends Service {
                     File file;
                     switch((int)cmd) {
                         case PC_REQUEST_NEXT:
-                            Log.e(TAG, "Got here 0");
                             if(nextIndex >= queue.size() || queue.size() == 0) {
-                                Log.e(TAG, "Got here 0.1");
                                 nos.write(longToBytes(NO_DATA));
                                 nos.flush();
                                 closeSocket = !waitForAck();
