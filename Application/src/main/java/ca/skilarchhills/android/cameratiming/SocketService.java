@@ -19,7 +19,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Created by jon on 03/01/18.
@@ -113,7 +112,7 @@ public class SocketService extends Service {
         return false;
     }
 
-    public class MyBinder extends Binder {
+    class MyBinder extends Binder {
         SocketService getService() {
             return SocketService.this;
         }
@@ -165,29 +164,18 @@ public class SocketService extends Service {
      */
     private long readLong() {
 
-        //FIXME Have some sort of timeout for if we don't receive 8 bytes
-
-        Log.e(TAG, "Reading long");
-
+        long start = System.currentTimeMillis();
         int bytesRead = 0;
         int temp;
         byte[] buffer = new byte[8];
 
         try {
             if (!socket.getInetAddress().isReachable(2000)) {
-                Log.e(TAG, "Not reachable");
+                Log.e(TAG, "Reading long - Client not reachable");
                 return -1;
             }
 
-            /* Try reading */
-            /*
-            while(nis.available() < 8) {
-                Log.e(TAG, "Bytes available is " + nis.available());
-                SystemClock.sleep(50);
-            }
-            */
-
-            while (bytesRead < 8) {
+            while (bytesRead < 8 && System.currentTimeMillis() - start < 8000) {
                 temp = nis.read();
                 if(temp == -1) {
                     Log.e(TAG, "Read -1 reading long");
@@ -195,14 +183,11 @@ public class SocketService extends Service {
                 }
                 buffer[bytesRead++] = (byte)temp;
             }
-
-            Log.e(TAG, "Read long");
-
             return bytesToLong(buffer);
         } catch (IOException e) {
             e.printStackTrace();
 
-            Log.e(TAG, "Read long - caught exception");
+            Log.e(TAG, "Reading long - caught exception");
 
             return -1;
         }
@@ -273,6 +258,10 @@ public class SocketService extends Service {
      * Starts a network server if wifi is enabled that the PC can connect to
      */
     private void startNetwork() {
+        // To close socket if necessary
+        boolean closeSocket = false;
+
+
         // Wait until wifi is connected
         while(!isWifiConnected())
             SystemClock.sleep(5000);
@@ -288,7 +277,7 @@ public class SocketService extends Service {
                 Log.i(TAG, "doInBackground: Socket created, streams assigned");
                 Log.i(TAG, "doInBackground: Waiting for initial data");
 
-                int fileIndex = -1;
+                int fileIndex;
 
                 while (socket.isConnected() && !socket.isClosed() && !serviceClosing) {
                     // Read next command from PC
@@ -302,14 +291,13 @@ public class SocketService extends Service {
 
                     File file;
                     switch((int)cmd) {
-                        // FIXME check return code of waitForAck and actually break while loop if necessary
                         case PC_REQUEST_NEXT:
                             Log.e(TAG, "Got here 0");
                             if(nextIndex >= queue.size() || queue.size() == 0) {
                                 Log.e(TAG, "Got here 0.1");
                                 nos.write(longToBytes(NO_DATA));
                                 nos.flush();
-                                waitForAck();
+                                closeSocket = !waitForAck();
                                 continue;
                             }
                             fileIndex = nextIndex++;
@@ -319,7 +307,8 @@ public class SocketService extends Service {
                             int index = (int)readLong();
                             if(queue.size() - 1 > index) {
                                 nos.write(longToBytes(NO_DATA));
-                                waitForAck();
+                                closeSocket = !waitForAck();
+                                continue;
                             }
                             fileIndex = index;
                             file = new File(queue.get(index));
@@ -328,11 +317,12 @@ public class SocketService extends Service {
                         default:
                             // Not implemented
                             nos.write(longToBytes(NOT_IMPLEMENTED));
-                            waitForAck();
+                            closeSocket = !waitForAck();
                             continue;
                     }
 
-                    if(!socket.getInetAddress().isReachable(2000))
+                    // Check if we should close the socket due to an error
+                    if(closeSocket || !socket.getInetAddress().isReachable(2000))
                         break;
 
                     if(!sendFile(file, fileIndex))
