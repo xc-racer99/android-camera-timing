@@ -69,7 +69,9 @@ import android.widget.Spinner;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileOutputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -125,7 +127,20 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
 
         // Start our server
         Intent intent= new Intent(this, SocketService.class);
-        // FIXME Send initial file pics
+
+        // Add all the files already existing
+        File[] initialPics = getExternalFilesDir(null).listFiles(new FilenameFilter() {
+            public boolean accept(File directory, String fileName) {
+                return fileName.matches("\\d+\\.jpg");
+            }
+        });
+        String[] fileNames = new String[initialPics.length];
+        for(int i = 0; i < initialPics.length; i++) {
+            fileNames[i] = initialPics[i].getAbsolutePath();
+        }
+        intent.putExtra(SocketService.initialPicsTag, fileNames);
+
+        // Bind to SocketService
         bindService(intent, this, Context.BIND_AUTO_CREATE);
 
         listener.enable();
