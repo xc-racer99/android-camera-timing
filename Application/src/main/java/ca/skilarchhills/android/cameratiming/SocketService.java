@@ -5,8 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.SystemClock;
@@ -58,9 +56,6 @@ public class SocketService extends Service {
     BufferedInputStream nis;
     BufferedOutputStream nos;
 
-    // To determine if wifi is enabled or not
-    private WifiManager wifiMan;
-
     // Contains all of the images we know of
     private ArrayList<String> queue = new ArrayList<>();
     private int nextIndex;
@@ -75,8 +70,6 @@ public class SocketService extends Service {
         });
         thread.start();
         Log.d(TAG, "Thread started");
-
-        wifiMan = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
     }
 
     @Override
@@ -164,21 +157,6 @@ public class SocketService extends Service {
             }
         }
         return false;
-
-        /*
-
-        Log.e(TAG, "Check if wifi is connected");
-
-        if(wifiMan != null && wifiMan.isWifiEnabled()) {
-            Log.e(TAG, "got here");
-            WifiInfo wifiInfo = wifiMan.getConnectionInfo();
-            if( wifiInfo.getNetworkId() == -1 ) {
-                return true;
-            }
-        }
-        return false;
-
-        */
     }
 
     /**
