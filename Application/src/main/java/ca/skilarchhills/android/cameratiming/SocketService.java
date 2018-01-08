@@ -19,6 +19,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Created by jon on 03/01/18.
@@ -57,14 +58,21 @@ public class SocketService extends Service {
 
     // Contains all of the images we know of
     private ArrayList<String> queue = new ArrayList<>();
+    ReentrantLock queueLock = new ReentrantLock();
     private int nextIndex;
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // Used to add an additional picture
         String nextPic = intent.getStringExtra(picsTag);
-        if(nextPic != null)
-            queue.add(nextPic);
+        if(nextPic != null) {
+            queueLock.lock();
+            try {
+                queue.add(nextPic);
+            } finally {
+                queueLock.unlock();
+            }
+        }
 
         Log.d(TAG, "onStartCommand run");
 
@@ -76,13 +84,18 @@ public class SocketService extends Service {
         String[] initialPics = intent.getStringArrayExtra(initialPicsTag);
 
         // Add initial pictures
-        if(initialPics != null && initialPics.length > 0)
-            Collections.addAll(queue, initialPics);
+        queueLock.lock();
+        try {
+            if (initialPics != null && initialPics.length > 0)
+                Collections.addAll(queue, initialPics);
 
-        if(queue.size() == 0)
-            nextIndex = 0;
-        else
-            nextIndex = queue.size() - 1;
+            if (queue.size() == 0)
+                nextIndex = 0;
+            else
+                nextIndex = queue.size() - 1;
+        } finally {
+            queueLock.unlock();
+        }
 
         // Start our network socket
         Thread thread = new Thread(new Runnable() {
@@ -289,33 +302,38 @@ public class SocketService extends Service {
                     }
 
                     File file;
-                    switch((int)cmd) {
-                        case PC_REQUEST_NEXT:
-                            if(nextIndex >= queue.size() || queue.size() == 0) {
-                                nos.write(longToBytes(NO_DATA));
-                                nos.flush();
+                    queueLock.lock();
+                    try {
+                        switch ((int) cmd) {
+                            case PC_REQUEST_NEXT:
+                                if (nextIndex >= queue.size() || queue.size() == 0) {
+                                    nos.write(longToBytes(NO_DATA));
+                                    nos.flush();
+                                    closeSocket = !waitForAck();
+                                    continue;
+                                }
+                                fileIndex = nextIndex++;
+                                file = new File(queue.get(fileIndex));
+                                break;
+                            case PC_REQUEST_SPECIFIC:
+                                int index = (int) readLong();
+                                if (queue.size() - 1 > index) {
+                                    nos.write(longToBytes(NO_DATA));
+                                    closeSocket = !waitForAck();
+                                    continue;
+                                }
+                                fileIndex = index;
+                                file = new File(queue.get(index));
+                                break;
+                            case PC_REQUEST_ALL:
+                            default:
+                                // Not implemented
+                                nos.write(longToBytes(NOT_IMPLEMENTED));
                                 closeSocket = !waitForAck();
                                 continue;
-                            }
-                            fileIndex = nextIndex++;
-                            file = new File(queue.get(fileIndex));
-                            break;
-                        case PC_REQUEST_SPECIFIC:
-                            int index = (int)readLong();
-                            if(queue.size() - 1 > index) {
-                                nos.write(longToBytes(NO_DATA));
-                                closeSocket = !waitForAck();
-                                continue;
-                            }
-                            fileIndex = index;
-                            file = new File(queue.get(index));
-                            break;
-                        case PC_REQUEST_ALL:
-                        default:
-                            // Not implemented
-                            nos.write(longToBytes(NOT_IMPLEMENTED));
-                            closeSocket = !waitForAck();
-                            continue;
+                        }
+                    } finally {
+                        queueLock.unlock();
                     }
 
                     // Check if we should close the socket due to an error
