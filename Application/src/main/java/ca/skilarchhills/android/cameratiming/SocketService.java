@@ -89,10 +89,7 @@ public class SocketService extends Service {
             if (initialPics != null && initialPics.length > 0)
                 Collections.addAll(queue, initialPics);
 
-            if (queue.size() == 0)
-                nextIndex = 0;
-            else
-                nextIndex = queue.size() - 1;
+            nextIndex = queue.size();
         } finally {
             queueLock.unlock();
         }
