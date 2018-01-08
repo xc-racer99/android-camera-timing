@@ -184,7 +184,7 @@ public class SocketService extends Service {
                 return -1;
             }
 
-            while (bytesRead < 8 && System.currentTimeMillis() - start < 8000) {
+            while (bytesRead < 8 && System.currentTimeMillis() - start < 10000) {
                 temp = nis.read();
                 if(temp == -1) {
                     Log.e(TAG, "Read -1 reading long");
