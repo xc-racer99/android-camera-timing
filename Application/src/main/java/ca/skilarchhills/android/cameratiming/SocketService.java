@@ -60,18 +60,6 @@ public class SocketService extends Service {
     private int nextIndex;
 
     @Override
-    public void onCreate() {
-        // Start our network socket
-        Thread thread = new Thread(new Runnable() {
-            public void run() {
-                startNetwork();
-            }
-        });
-        thread.start();
-        Log.d(TAG, "Thread started");
-    }
-
-    @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // Used to add an additional picture
         String nextPic = intent.getStringExtra(picsTag);
@@ -95,6 +83,14 @@ public class SocketService extends Service {
             nextIndex = 0;
         else
             nextIndex = queue.size() - 1;
+
+        // Start our network socket
+        Thread thread = new Thread(new Runnable() {
+            public void run() {
+                startNetwork();
+            }
+        });
+        thread.start();
 
         Log.d(TAG, "onBind run");
 
