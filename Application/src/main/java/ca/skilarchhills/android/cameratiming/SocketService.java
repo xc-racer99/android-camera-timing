@@ -179,11 +179,6 @@ public class SocketService extends Service {
         byte[] buffer = new byte[8];
 
         try {
-            if (!socket.getInetAddress().isReachable(2000)) {
-                Log.e(TAG, "Reading long - Client not reachable");
-                return -1;
-            }
-
             while (bytesRead < 8 && System.currentTimeMillis() - start < 10000) {
                 temp = nis.read();
                 if(temp == -1) {
@@ -240,8 +235,6 @@ public class SocketService extends Service {
             FileInputStream fis = new FileInputStream(file);
 
             for(int i = 0; i < numBytes / bufsize; i++) {
-                if(!socket.getInetAddress().isReachable(2000))
-                    return false;
                 if(fis.read(buffer, 0, bufsize) == -1)
                     return false;
                 else
@@ -334,7 +327,7 @@ public class SocketService extends Service {
                     }
 
                     // Check if we should close the socket due to an error
-                    if(closeSocket || !socket.getInetAddress().isReachable(2000))
+                    if(closeSocket)
                         break;
 
                     if(!sendFile(file, fileIndex))
