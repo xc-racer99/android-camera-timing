@@ -87,6 +87,9 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         super.onCreate(savedInstanceState);
         setContentView(R.layout.fragment_camera2_basic);
 
+        // Set the context
+        mContext = this;
+
         // Keep the screen from timing out
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
@@ -342,6 +345,11 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
      */
     private int mOrientation = 0;
 
+    /**
+     * Context to use when making Toasts
+     */
+    private Context mContext;
+
 
     /**
      * A {@link CameraCaptureSession.CaptureCallback} that handles events related to JPEG capture.
@@ -374,7 +382,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
                                            @NonNull int[] grantResults) {
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
             if (grantResults.length != 1 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "This app requires the Camera permission.  Exiting.", Toast.LENGTH_LONG).show();
+                Toast.makeText(mContext, "This app requires the Camera permission.  Exiting.", Toast.LENGTH_LONG).show();
                 finish();
             }
         } else {
@@ -519,7 +527,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
         } catch (NullPointerException e) {
             // Currently an NPE is thrown when the Camera2API is used but not supported on the
             // device this code runs.
-            Toast.makeText(this, "Camera2 API not supported on this device!  This app will not work", Toast.LENGTH_LONG).show();
+            Toast.makeText(mContext, "Camera2 API not supported on this device!  This app will not work", Toast.LENGTH_LONG).show();
             finish();
         }
     }
@@ -700,7 +708,7 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
      */
     public void takePicture() {
         if (networkService == null || !networkService.isConnected()) {
-            Toast.makeText(this, "Server not started, won't be able to sync file", Toast.LENGTH_SHORT).show();
+            Toast.makeText(mContext, "Server not started, won't be able to sync file", Toast.LENGTH_SHORT).show();
         }
 
         long time = System.currentTimeMillis();
@@ -734,14 +742,14 @@ public class CameraActivity extends Activity implements View.OnClickListener, Ad
             }
         }
 
-        Toast.makeText(this, String.format(Locale.US, "Time: %d", System.currentTimeMillis() - time), Toast.LENGTH_SHORT).show();
+        Toast.makeText(mContext, String.format(Locale.US, "Time: %d", System.currentTimeMillis() - time), Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onServiceConnected(ComponentName name, IBinder binder) {
         SocketService.MyBinder b = (SocketService.MyBinder) binder;
         networkService = b.getService();
-        Toast.makeText(CameraActivity.this, "Connected to service", Toast.LENGTH_SHORT).show();
+        Toast.makeText(mContext, "Connected to service", Toast.LENGTH_SHORT).show();
     }
 
     @Override
